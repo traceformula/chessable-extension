@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Chessable Utility Extension",
+  "description": "Extension to add support for chessable users",
+  "version": "1.0",
+  "action": {
+    "default_popup": "main.html",
+    "default_icon": "hi.png"
+  },
+  "content_scripts": [
+    {
+      "js": ["scripts/find_position_in_course.js"],
+      "matches": [
+        "https://www.chessable.com/explore/*",
+        "https://chessable.com/explore/*"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

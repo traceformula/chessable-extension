@@ -7,9 +7,9 @@
 (function () {
 	const ns = (globalThis.__KBM = globalThis.__KBM || {});
 	const adapter = ns.chesscom;
-	const { match, forms, canon } = ns.matcher;
+	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.6.0';
+	ns.version = '1.7.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -32,6 +32,10 @@
 	// resolves uniquely. In sparse positions one letter can be unambiguous - with
 	// only one rook move available "r" alone is enough - and a move going out on
 	// the first keystroke is indistinguishable from a stray keypress.
+	//
+	// The stronger guard is matcher.isComplete: a move also waits until a whole
+	// destination square has been typed, so a half-finished square cannot commit
+	// some unintended move that happens to share its prefix.
 	const MIN_AUTO_KEYS = 2;
 
 	// Settings arrive from the extension's storage by way of the isolated-world
@@ -242,7 +246,9 @@
 		buffer = next;
 
 		if (result.state === 'unique') {
-			if (requiresEnter() || canon(next).length < MIN_AUTO_KEYS) {
+			const safeToPlay = canon(next).length >= MIN_AUTO_KEYS &&
+				isComplete(next) && !isExtendable(next, result.move, moves);
+			if (requiresEnter() || !safeToPlay) {
 				pending = result.move;
 				render(result, result.move.san + ' - enter to play');
 				return;

@@ -12,8 +12,14 @@ A Chrome extension with two unrelated conveniences:
 Type a move on any chess.com board. A move plays as soon as what you have
 typed can no longer become any other legal move, so `e4` takes two keystrokes
 and needs no Enter. Anything you type after that which still spells the move
-you just played is absorbed, so typing `Nf3` in full does not leak a stray `3`
-into the next move.
+you just played is absorbed, so a trailing `+` or `=Q` does not leak into the
+next move.
+
+Auto-play waits for a whole destination square, and waits again if any other
+legal move could still grow out of what you have typed. Without the first
+rule, typing `bd6` when no bishop can reach d6 would play `Bd2` on the way -
+the wrong move, which is worse than being told the move is illegal. Without
+the second, `ooo` would castle short as it passed through `oo`.
 
 Input is forgiving:
 

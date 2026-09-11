@@ -110,5 +110,33 @@
 		return { state: 'ambiguous', candidates };
 	}
 
-	return { canon, forms, match };
+	// Whether the input names a destination square outright, rather than stopping
+	// part-way through one.
+	//
+	// Auto-play must wait for this. "bd" can be the only legal move beginning
+	// those letters while the player is still typing "bd6", and committing on the
+	// bare file plays some other bishop move instead of reporting that the move
+	// they wanted was never legal. A wrong move is far worse than a refusal.
+	function isComplete(raw) {
+		const c = canon(raw);
+		if (c === 'oo' || c === 'ooo') return true;       // castling names no square
+		if (/[a-h][1-8]$/.test(c)) return true;
+		return /[a-h][1-8][qrbn]$/.test(c);               // promotion piece trails it
+	}
+
+	// Whether some other legal move could still grow out of what has been typed.
+	//
+	// "oo" resolves to O-O, but O-O-O is one keystroke further on, so committing
+	// on "oo" castles the wrong way for anyone typing "ooo". Moves sharing the
+	// chosen move's from/to do not count - those are only the promotion choices,
+	// and the default has already been picked.
+	function isExtendable(raw, chosen, moves) {
+		const buf = canon(raw);
+		return moves.some(m => {
+			if (m.from === chosen.from && m.to === chosen.to) return false;
+			return forms(m).some(f => f.length > buf.length && f.startsWith(buf));
+		});
+	}
+
+	return { canon, forms, match, isComplete, isExtendable };
 });

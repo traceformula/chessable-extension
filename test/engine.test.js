@@ -71,5 +71,75 @@ test('pins are respected, so an illegal SAN is not offered', () => {
 	assert.strictEqual(match('nd4', moves).state, 'none');
 });
 
+// Replays the commit rule exactly as main.js applies it.
+const { isComplete, isExtendable } = require('../scripts/keyboard-move/matcher.js');
+function typeOut(text, moves) {
+	let buffer = '', played = null, rejected = null;
+	for (const ch of text) {
+		const next = buffer + ch;
+		const r = match(next, moves);
+		if (r.state === 'none') { rejected = next; break; }
+		buffer = next;
+		if (r.state === 'unique' && buffer.length >= 2 && isComplete(buffer) &&
+				!isExtendable(buffer, r.move, moves)) {
+			played = r.move.san;
+			break;
+		}
+	}
+	return { played, rejected, buffer };
+}
+
+test('a half-typed square never commits a different move', () => {
+	// From a real game: white to move, no bishop can reach d6, but "bd" is the
+	// only move starting with those letters. Typing "bd6" used to play Bd2.
+	const moves = legal('r1bq1rk1/p2n1ppp/1ppb1n2/3pp3/4P3/2PP1NP1/PPQ2PBP/RNB2RK1 w - - 0 9');
+	assert.strictEqual(match('bd', moves).move.san, 'Bd2', 'still resolves, just must not fire');
+	const r = typeOut('bd6', moves);
+	assert.strictEqual(r.played, null, 'played ' + r.played + ' instead of refusing');
+	assert.strictEqual(r.rejected, 'bd6');
+});
+
+test('typing a legal bishop move still works', () => {
+	const moves = legal('r1bq1rk1/p2n1ppp/1ppb1n2/3pp3/4P3/2PP1NP1/PPQ2PBP/RNB2RK1 w - - 0 9');
+	assert.strictEqual(typeOut('bd2', moves).played, 'Bd2');
+	assert.strictEqual(typeOut('bg5', moves).played, 'Bg5');
+});
+
+test('pawn moves still commit in two keystrokes', () => {
+	const moves = legal('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+	const r = typeOut('e4', moves);
+	assert.strictEqual(r.played, 'e4');
+	assert.strictEqual(r.buffer, 'e4');
+});
+
+test('piece moves now need the whole destination square', () => {
+	const moves = legal('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1');
+	// "nf" resolves uniquely to Nf3 but must wait for the rank.
+	assert.strictEqual(match('nf', moves).move.san, 'Nf3');
+	assert.strictEqual(typeOut('nf', moves).played, null);
+	assert.strictEqual(typeOut('nf3', moves).played, 'Nf3');
+});
+
+test('typing ooo does not castle short on the way', () => {
+	// Both castles legal: "oo" resolves to O-O but O-O-O is one key further on,
+	// so it has to wait rather than fire.
+	const moves = legal('r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1');
+	assert.strictEqual(match('oo', moves).move.san, 'O-O', 'still resolves');
+	assert.strictEqual(typeOut('oo', moves).played, null, 'must not fire yet');
+	assert.strictEqual(typeOut('ooo', moves).played, 'O-O-O');
+});
+
+test('castling commits at once when only one castle is legal', () => {
+	const moves = legal('r3k3/8/8/8/8/8/8/4K2R w Kk - 0 1');
+	assert.strictEqual(typeOut('oo', moves).played, 'O-O');
+});
+
+test('promotion still defaults to queen without waiting', () => {
+	// The only moves extending "e8" are the other promotion pieces, which share
+	// a from/to with the chosen move, so they must not hold it up.
+	const moves = legal('8/4P3/8/8/8/8/8/K6k w - - 0 1');
+	assert.strictEqual(typeOut('e8', moves).played, 'e8=Q');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

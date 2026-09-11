@@ -36,7 +36,12 @@
 		//
 		// Pawn moves are excluded throughout: stripping the file from "exd5" would
 		// collide with the unrelated pawn push "d5".
-		const piece = /^[nbrqk]/.test(c) ? c[0] : null;
+		// Read the piece letter off the original SAN, where case still separates a
+		// piece from a file. canon() has lowercased by this point, so testing it
+		// would count the b-file pawn move "b5" as a bishop move and hand it
+		// bishop-style origin forms - giving "b5" the spelling "bb5", which then
+		// collides with a real bishop move to the b-file.
+		const piece = /^[NBRQK]/.test(move.san || '') ? c[0] : null;
 		if (piece && move.from && move.to) {
 			const cap = c.includes('x') ? 'x' : '';
 			const from = canon(move.from);
@@ -132,10 +137,16 @@
 	// and the default has already been picked.
 	function isExtendable(raw, chosen, moves) {
 		const buf = canon(raw);
-		return moves.some(m => {
-			if (m.from === chosen.from && m.to === chosen.to) return false;
-			return forms(m).some(f => f.length > buf.length && f.startsWith(buf));
-		});
+		return moves.some(m => forms(m).some(f => {
+			if (f.length <= buf.length || !f.startsWith(buf)) return false;
+			// The one extension that does not count is a promotion piece on the
+			// move already chosen: "e8" should play e8=Q rather than wait for a
+			// letter. Anything else does count, including a longer spelling of the
+			// same move - "b6" is a prefix of the UCI form "b6b5", so typing the
+			// illegal "b6" must not quietly play b5.
+			const samePlace = m.from === chosen.from && m.to === chosen.to;
+			return !(samePlace && /^[qrbn]$/.test(f.slice(buf.length)));
+		}));
 	}
 
 	return { canon, forms, match, isComplete, isExtendable };

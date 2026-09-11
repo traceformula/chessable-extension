@@ -12,6 +12,7 @@ function test(name, fn) {
 	try { fn(); passed++; }
 	catch (e) { failed++; console.error('FAIL  ' + name + '\n      ' + e.message); }
 }
+const { forms } = require('../scripts/keyboard-move/matcher.js');
 const legal = fen => new Chess(fen).moves({ verbose: true })
 	.map(m => ({ san: m.san, from: m.from, to: m.to, promotion: m.promotion }));
 
@@ -139,6 +140,27 @@ test('promotion still defaults to queen without waiting', () => {
 	// a from/to with the chosen move, so they must not hold it up.
 	const moves = legal('8/4P3/8/8/8/8/8/K6k w - - 0 1');
 	assert.strictEqual(typeOut('e8', moves).played, 'e8=Q');
+});
+
+test('a b-file pawn move is not mistaken for a bishop move', () => {
+	// canon() lowercases, so "b5" and "Bb7" both begin with b. Reading the piece
+	// letter off the canonical form gave the pawn bishop-style spellings such as
+	// "bb5", which then collided with a real bishop move to the b-file.
+	const moves = legal('rnbqkbnr/p1pppppp/1p6/8/8/1P6/P1PPPPPP/RNBQKBNR b KQkq - 0 2');
+	const pawn = moves.find(m => m.san === 'b5');
+	assert.ok(!forms(pawn).includes('bb5'), forms(pawn).join(' '));
+	const r = match('bb', moves);
+	assert.strictEqual(r.state, 'unique');
+	assert.strictEqual(r.move.san, 'Bb7');
+	assert.strictEqual(typeOut('bb7', moves).played, 'Bb7');
+	assert.strictEqual(typeOut('b5', moves).played, 'b5');
+});
+
+test('an origin square does not commit the move that starts there', () => {
+	// "b6" is not a legal move, but it prefixes the UCI spelling "b6b5".
+	const moves = legal('rnbqkbnr/p1pppppp/1p6/8/8/1P6/P1PPPPPP/RNBQKBNR b KQkq - 0 2');
+	assert.strictEqual(typeOut('b6', moves).played, null);
+	assert.strictEqual(typeOut('b6b5', moves).played, 'b5');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

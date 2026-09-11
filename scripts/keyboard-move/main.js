@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.10.0';
+	ns.version = '1.10.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -252,6 +252,18 @@
 		if (!site) return;
 
 		if (site.inputMode === 'coords') {
+			const nav = { ArrowLeft: 'back', ArrowRight: 'forward',
+				ArrowUp: 'toStart', ArrowDown: 'toEnd', Home: 'toStart', End: 'toEnd' };
+			if (nav[e.key]) {
+				e.preventDefault();
+				e.stopPropagation();
+				reset();
+				if (!site[nav[e.key]]()) {
+					ns.hud.show('', { state: 'none', candidates: [] }, 'no navigation here');
+					scheduleHide('message');
+				}
+				return;
+			}
 			if (e.key === 'Escape') {
 				if (buffer || ns.hud.isOpen()) { e.preventDefault(); reset(); }
 				return;
@@ -261,6 +273,7 @@
 				ns.hud.help([
 					'type two squares: file, rank, file, rank  \u2014  e.g. 5E5A',
 					'files 1-9  \u00b7  ranks A-J  \u00b7  backspace to correct  \u00b7  esc clear',
+					'\u2190 \u2192 step   \u2191 \u2193 first / last',
 					'moves are checked by the server, not here',
 				]);
 				scheduleHide('help');

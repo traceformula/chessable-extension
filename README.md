@@ -63,7 +63,10 @@ as it is for a mouse move.
 
 The board geometry is read from the page's own file and rank labels at
 runtime, so a board drawn from the other side resolves without a special case.
-Navigation, takeback and premoves are not available there.
+
+Arrows step through the moves by driving the client's own `<<` `<` `>` `>>`
+controls, matched on the labels drawn on them — a GWT build leaves no id or
+stable class to match instead. Takeback and premoves are not available there.
 
 ### Site differences
 

@@ -87,12 +87,13 @@
 
 	// GWT wires ordinary DOM handlers, so a synthesised click is indistinguishable
 	// from a real one - there is no isTrusted check to get past.
-	function clickAt(point) {
-		const target = document.elementFromPoint(point.x, point.y);
+	function clickElement(target, point) {
 		if (!target) return false;
+		const r = target.getBoundingClientRect();
+		const at = point || { x: r.left + r.width / 2, y: r.top + r.height / 2 };
 		const base = {
 			bubbles: true, cancelable: true, composed: true, view: window,
-			clientX: point.x, clientY: point.y, button: 0,
+			clientX: at.x, clientY: at.y, button: 0,
 		};
 		for (const type of ['mousedown', 'mouseup', 'click']) {
 			target.dispatchEvent(new MouseEvent(type, {
@@ -100,6 +101,32 @@
 			}));
 		}
 		return true;
+	}
+
+	function clickAt(point) {
+		return clickElement(document.elementFromPoint(point.x, point.y), point);
+	}
+
+	// The client's own move-navigation controls, identified by the labels it
+	// draws on them. There is no id or stable class to match instead - every
+	// symbol in a GWT build is minified - so the visible text is the handle.
+	const NAV_LABEL = { toStart: '<<', back: '<', forward: '>', toEnd: '>>' };
+
+	function navButton(which) {
+		const label = NAV_LABEL[which];
+		for (const el of document.querySelectorAll('button, a, div, span, td')) {
+			if (el.children.length) continue;
+			if ((el.textContent || '').trim() !== label) continue;
+			const r = el.getBoundingClientRect();
+			if (r.width < 8 || r.height < 8) continue;   // skip anything not drawn
+			return el;
+		}
+		return null;
+	}
+
+	function navigate(which) {
+		const el = navButton(which);
+		return el ? clickElement(el) : false;
 	}
 
 	ns.clubxiangqi = {
@@ -146,14 +173,17 @@
 			return !after || after !== before;
 		},
 
-		// Not available: the client exposes no navigation, takeback or premove.
 		status() { return geometry() ? { playable: true, reason: null } : { playable: false, reason: 'no board' }; },
 		isMyTurn() { return this.status().playable; },
 		legalMoves() { return []; },
-		back() { return false; },
-		forward() { return false; },
-		toStart() { return false; },
-		toEnd() { return false; },
+
+		// Navigation drives the client's own << < > >> controls.
+		back() { return navigate('back'); },
+		forward() { return navigate('forward'); },
+		toStart() { return navigate('toStart'); },
+		toEnd() { return navigate('toEnd'); },
+
+		// No takeback or premove: the client offers neither.
 		canUndo() { return false; },
 		undo() { return false; },
 		premoveMoves() { return []; },

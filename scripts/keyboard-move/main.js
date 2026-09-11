@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.10.2';
+	ns.version = '1.11.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -247,9 +247,18 @@
 		e.__kbmSeen = true;
 
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
-		if (editable(e.target)) return;
 		const site = adapter();
 		if (!site) return;
+
+		// Escape returns from the chat line to the board. Every other key typed in
+		// a text field is the site's, so chat still works normally.
+		if (site.inputMode === 'coords' && e.key === 'Escape' && editable(e.target)) {
+			e.preventDefault();
+			e.target.blur();
+			reset();
+			return;
+		}
+		if (editable(e.target)) return;
 
 		if (site.inputMode === 'coords') {
 			const nav = { ArrowLeft: 'back', ArrowRight: 'forward',
@@ -271,12 +280,38 @@
 				if (buffer || ns.hud.isOpen()) { e.preventDefault(); reset(); }
 				return;
 			}
+
+			// Lobby shortcuts. A move always begins with a file digit, so a letter
+			// typed with an empty buffer cannot be part of one and is free to mean
+			// something else. "/" focuses the chat line, as it does most places.
+			if (!buffer) {
+				if (e.key === '/') {
+					e.preventDefault();
+					const ok = site.focusChat && site.focusChat();
+					if (!ok) {
+						ns.hud.show('', { state: 'none', candidates: [] }, 'no chat box found');
+						scheduleHide('message');
+					}
+					return;
+				}
+				const label = site.controls && site.controls[e.key.toLowerCase()];
+				if (label) {
+					e.preventDefault();
+					e.stopImmediatePropagation();
+					const ok = site.activate(label);
+					ns.hud.show('', { state: ok ? 'unique' : 'none', candidates: [] },
+						ok ? label : label + ' \u2014 not found');
+					scheduleHide('message');
+					return;
+				}
+			}
 			if (e.key === '?') {
 				e.preventDefault();
 				ns.hud.help([
 					'type two squares: file, rank, file, rank  \u2014  e.g. 5E5A',
 					'files 1-9  \u00b7  ranks A-J  \u00b7  backspace to correct  \u00b7  esc clear',
-					'\u2190 \u2192 step   \u2191 \u2193 first / last',
+					'\u2190 \u2192 step   \u2191 \u2193 first / last   /  chat   esc back to board',
+					'f findtable   r rooms   n new tables   t tables   j join   o options',
 					'moves are checked by the server, not here',
 				]);
 				scheduleHide('help');

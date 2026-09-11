@@ -68,6 +68,24 @@ Arrows step through the moves by driving the client's own `<<` `<` `>` `>>`
 controls, matched on the labels drawn on them — a GWT build leaves no id or
 stable class to match instead. Takeback and premoves are not available there.
 
+The lobby controls have shortcuts too, which fire only when no move is
+half-typed — a move always starts with a file digit, so a letter on its own
+cannot be part of one:
+
+| Key | Control |
+| --- | --- |
+| `f` | FINDTABLE |
+| `r` | rooms |
+| `n` | new tables |
+| `t` | tables |
+| `j` | Join! |
+| `o` | Options |
+| `/` | focus the chat line |
+| `Esc` | from chat, back to the board |
+
+These are matched on the visible label, so if the client renames a control its
+shortcut reports `not found` rather than clicking something else.
+
 ### Site differences
 
 Chessable's board is an iframe, so keystrokes only reach it once it has focus.

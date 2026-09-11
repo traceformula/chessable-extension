@@ -144,6 +144,36 @@
 		return labelled(NAV_LABEL[which], scope);
 	}
 
+	// Lobby controls, driven the same way: by the text drawn on them. Matching is
+	// exact once trimmed, so "tables" does not also hit "new tables".
+	function control(label) {
+		const wanted = label.toLowerCase();
+		for (const el of document.querySelectorAll('button, a, div, span, td, th')) {
+			if (el.children.length) continue;
+			if ((el.textContent || '').trim().toLowerCase() !== wanted) continue;
+			const r = el.getBoundingClientRect();
+			if (r.width < 8 || r.height < 8) continue;
+			return el;
+		}
+		return null;
+	}
+
+	function chatInput() {
+		const fields = document.querySelectorAll('input[type="text"], input:not([type]), textarea');
+		for (const el of fields) {
+			const hint = ((el.placeholder || '') + ' ' + (el.getAttribute('aria-label') || '')).toLowerCase();
+			if (hint.includes('chat') || hint.includes('message')) return el;
+		}
+		// Fall back to the widest visible text field, which is the chat line.
+		let best = null, width = 0;
+		for (const el of fields) {
+			if (el.type === 'password') continue;
+			const r = el.getBoundingClientRect();
+			if (r.width > width && r.height > 8) { best = el; width = r.width; }
+		}
+		return best;
+	}
+
 	function navigate(which) {
 		const el = navButton(which);
 		return el ? clickElement(el) : false;
@@ -202,6 +232,25 @@
 		forward() { return navigate('forward'); },
 		toStart() { return navigate('toStart'); },
 		toEnd() { return navigate('toEnd'); },
+
+		// Lobby shortcuts. The labels are the client's own; press a key with no
+		// move half-typed and the matching control is clicked.
+		controls: {
+			f: 'FINDTABLE', r: 'rooms', n: 'new tables',
+			t: 'tables', j: 'Join!', o: 'Options',
+		},
+
+		activate(label) {
+			const el = control(label);
+			return el ? clickElement(el) : false;
+		},
+
+		focusChat() {
+			const el = chatInput();
+			if (!el) return false;
+			el.focus();
+			return document.activeElement === el;
+		},
 
 		// No takeback or premove: the client offers neither.
 		canUndo() { return false; },

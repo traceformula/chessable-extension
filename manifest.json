@@ -1,20 +1,59 @@
 {
   "manifest_version": 3,
-  "name": "Chessable Utility Extension",
-  "description": "Extension to add support for chessable users",
-  "version": "1.0",
+  "name": "Chess Utility Extension",
+  "description": "Keyboard move input for chess.com, plus Chessable helpers",
+  "version": "1.6.0",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
   "action": {
-    "default_popup": "main.html",
-    "default_icon": "hi.png"
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
   },
   "content_scripts": [
     {
-      "js": ["scripts/find_position_in_course.js"],
+      "js": [
+        "scripts/find_position_in_course.js"
+      ],
       "matches": [
         "https://www.chessable.com/explore/*",
         "https://chessable.com/explore/*"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "js": [
+        "scripts/keyboard-move/vendor/chess.js",
+        "scripts/keyboard-move/matcher.js",
+        "scripts/keyboard-move/hud.js",
+        "scripts/keyboard-move/chesscom.js",
+        "scripts/keyboard-move/main.js"
+      ],
+      "matches": [
+        "https://www.chess.com/*"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "js": [
+        "scripts/keyboard-move/settings-bridge.js"
+      ],
+      "matches": [
+        "https://www.chess.com/*"
+      ],
+      "run_at": "document_start"
     }
   ]
 }

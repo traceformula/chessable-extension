@@ -21,7 +21,7 @@
 .kbm-cands { display: flex; gap: 7px; opacity: .78; font-size: 13px; }
 .kbm-cands span { padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.12); }
 .kbm-note { opacity: .7; font-size: 13px; }
-.kbm-hud[data-mode="help"] {
+.kbm-hud[data-open="1"][data-mode="help"] {
 	display: block; padding: 16px 19px 17px; border-radius: 11px;
 	max-width: min(94vw, 540px); line-height: 1.45;
 	/* Opaque, unlike the transient overlay: this one is read, and page content
@@ -138,7 +138,11 @@
 			noteEl.textContent = '';
 		},
 		hide() {
-			if (el) el.dataset.open = '0';
+			if (!el) return;
+			el.dataset.open = '0';
+			// Clear the mode too. The help rules set their own display, and leaving
+			// the attribute set kept the panel painted after it had been closed.
+			delete el.dataset.mode;
 		},
 		isOpen() {
 			return !!el && el.dataset.open === '1';

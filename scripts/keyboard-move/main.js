@@ -52,8 +52,13 @@
 	const CHANNEL = 'kbm-settings';
 
 	window.addEventListener('message', e => {
-		// Only same-window messages on our channel: the page can post too, and it
-		// has no business changing how moves commit.
+		// This filters cross-frame noise, not the page. A page script posts with
+		// e.source === window exactly as the bridge does, so it can set these
+		// values - and could equally overwrite __KBM outright, since a MAIN-world
+		// script shares the page's global scope. That is inherent to reaching the
+		// board API and is why nothing sensitive lives on this side: the settings
+		// below are display and commit preferences, and chrome.storage stays in
+		// the isolated world.
 		if (e.source !== window) return;
 		const data = e.data;
 		if (!data || data.channel !== CHANNEL || !data.settings) return;

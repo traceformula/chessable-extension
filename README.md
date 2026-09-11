@@ -1,15 +1,15 @@
 # Chess Utility Extension
 
-A Chrome extension with two unrelated conveniences:
+A Chrome extension with two conveniences:
 
-- **Keyboard move input for chess.com** — play by typing algebraic notation
-  instead of dragging pieces.
+- **Keyboard move input** — play by typing algebraic notation instead of
+  dragging pieces, on chess.com boards and Chessable explore boards.
 - **Find position in course** — on a Chessable explore page, jump to the
   current position inside the course.
 
 ## Playing by keyboard
 
-Type a move on any chess.com board. A move plays as soon as what you have
+Type a move on any chess.com board or Chessable explore board. A move plays as soon as what you have
 typed can no longer become any other legal move, so `e4` takes two keystrokes
 and needs no Enter. Anything you type after that which still spells the move
 you just played is absorbed, so a trailing `+` or `=Q` does not leak into the
@@ -47,6 +47,19 @@ Typing is ignored when it is not your turn, when the focus is in a text field
 so chat still works, and on boards you are only observing — those accept a
 move locally without ever submitting it, which looks like a played move whose
 clock keeps running.
+
+### Site differences
+
+Chessable's board is an iframe, so keystrokes only reach it once it has focus.
+The outer page forwards them in, which means typing works without clicking the
+board first.
+
+Moves there go through the board's own drop handler rather than straight to
+the position, so the move list, the FEN box and the opening explorer all
+update the way they would after a drag. Taking back with `u` is chess.com
+only: Chessable has no app-level retract to call, and rolling the position
+back by hand would leave its move list showing a move that is no longer there.
+Step back with the arrows instead.
 
 ### Settings
 

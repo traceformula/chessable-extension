@@ -229,4 +229,6 @@
 			return g ? safe(() => g.getFEN(), null) : null;
 		},
 	};
+
+	(ns.adapters = ns.adapters || []).push(ns.chesscom);
 })();

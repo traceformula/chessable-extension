@@ -6,10 +6,17 @@
 // of appended, which keeps the buffer always resolvable.
 (function () {
 	const ns = (globalThis.__KBM = globalThis.__KBM || {});
-	const adapter = ns.chesscom;
+	// Whichever registered adapter finds a board in this frame. Resolved lazily
+	// and re-resolved if it goes away, since a site may swap its board out.
+	let resolved = null;
+	function adapter() {
+		if (resolved && resolved.isReady()) return resolved;
+		resolved = (ns.adapters || []).find(a => a.isReady()) || null;
+		return resolved;
+	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.7.1';
+	ns.version = '1.8.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -114,7 +121,9 @@
 
 		// play() resolves only once the position has actually changed, so a move
 		// that went nowhere is reported rather than left looking successful.
-		Promise.resolve(adapter.play(move)).then(played => {
+		const site = adapter();
+		if (!site) return;
+		Promise.resolve(site.play(move)).then(played => {
 			if (played) return;
 			tail = null;
 			ns.hud.show(move.san, { state: 'none', candidates: [] }, 'not accepted');
@@ -130,7 +139,8 @@
 
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
 		if (editable(e.target)) return;
-		if (!adapter.isReady()) return;
+		const site = adapter();
+		if (!site) return;
 
 		// Navigation and retraction. None of these characters appear in algebraic
 		// notation, so they cannot collide with a move being typed.
@@ -143,14 +153,14 @@
 			e.preventDefault();
 			e.stopPropagation();
 			reset();
-			adapter[NAV[e.key]]();
+			site[NAV[e.key]]();
 			return;
 		}
 
 		if (e.key === 'u') {
 			e.preventDefault();
 			reset();
-			if (adapter.undo()) {
+			if (site.undo()) {
 				ns.hud.show('', { state: 'unique', candidates: [] }, 'took back');
 			} else {
 				ns.hud.show('', { state: 'none', candidates: [] },
@@ -194,7 +204,7 @@
 			buffer = buffer.slice(0, -1);
 			pending = null;
 			if (!buffer) return reset();
-			render(match(buffer, adapter.legalMoves()));
+			render(match(buffer, site.legalMoves()));
 			return;
 		}
 
@@ -209,7 +219,7 @@
 
 		// Typing is only meaningful when a move would really count. Keys are never
 		// swallowed here, so chess.com keeps its own shortcuts on boards we sit out.
-		const status = adapter.status();
+		const status = site.status();
 		if (!status.playable) {
 			if (buffer) reset();
 			// "not your turn" is the normal resting state and needs no commentary,
@@ -223,7 +233,7 @@
 			return;
 		}
 
-		const moves = adapter.legalMoves();
+		const moves = site.legalMoves();
 		if (!moves.length) {
 			// Reachable on a board that has not finished setting up. Saying so beats
 			// both silence and a misleading "no such move".

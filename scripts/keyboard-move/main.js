@@ -9,7 +9,7 @@
 	const adapter = ns.chesscom;
 	const { match, forms, canon } = ns.matcher;
 
-	ns.version = '1.4.3';
+	ns.version = '1.5.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -139,7 +139,7 @@
 				ns.hud.show('', { state: 'unique', candidates: [] }, 'took back');
 			} else {
 				ns.hud.show('', { state: 'none', candidates: [] },
-					'no undo here - use the board takeback');
+					'nothing to take back here');
 			}
 			scheduleHide('message');
 			return;

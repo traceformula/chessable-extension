@@ -16,6 +16,32 @@
 	// "analysis" and game review are local-only by design and must stay usable.
 	const READ_ONLY_MODE = /observ|spectat/i;
 
+	// The board's own Undo button. Matched on its accessible name, which is the
+	// only stable handle it offers - it carries no id, test attribute or
+	// distinguishing class. That makes this English-locale dependent; on a
+	// translated UI the game.undo() fallback takes over on unseated boards.
+	const UNDO_LABELS = ['Undo', 'Takeback', 'Take back'];
+
+	function undoControl() {
+		for (const label of UNDO_LABELS) {
+			const el = document.querySelector('button[aria-label="' + label + '"]');
+			if (el && !el.disabled) return el;
+		}
+		return null;
+	}
+
+	// chess.com's controls respond to synthetic events, so a keypress can drive
+	// the same button a click would.
+	function click(el) {
+		for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) {
+			const Ctor = type.startsWith('pointer') ? PointerEvent : MouseEvent;
+			el.dispatchEvent(new Ctor(type, {
+				bubbles: true, cancelable: true, composed: true, view: window,
+				button: 0, pointerId: 1, pointerType: 'mouse', isPrimary: true,
+			}));
+		}
+	}
+
 	function board() {
 		return document.querySelector('wc-chess-board');
 	}
@@ -170,12 +196,17 @@
 		toStart() { const g = game(); return g ? safe(() => { g.selectLineStart(); return true; }, false) : false; },
 		toEnd() { const g = game(); return g ? safe(() => { g.selectLineEnd(); return true; }, false) : false; },
 
-		// Retracting a move is a different matter. game.undo() rewinds the local
-		// model only, so on a seated board it would leave us showing a position the
-		// server disagrees with. It is allowed where there is no server to
-		// contradict - analysis and other unseated boards - and refused elsewhere
-		// in favour of the site's own takeback, which negotiates properly.
+		// Retracting a move goes through the board's own Undo control whenever one
+		// is present. That is the negotiated path - the same thing clicking the
+		// button does - so it stays correct on a seated board, where the server has
+		// an opinion about the position.
+		//
+		// game.undo() is the fallback, and only on unseated boards: it rewinds the
+		// local model alone, which on a seated board would leave us showing a
+		// position the server disagrees with and resolving the next move against a
+		// fantasy board.
 		canUndo() {
+			if (undoControl()) return true;
 			const g = game();
 			if (!g || typeof g.undo !== 'function') return false;
 			if (safe(() => g.getMode().usePlayingAs, false)) return false;
@@ -183,6 +214,11 @@
 		},
 
 		undo() {
+			const control = undoControl();
+			if (control) {
+				click(control);
+				return true;
+			}
 			const g = game();
 			if (!g || !this.canUndo()) return false;
 			return safe(() => { g.undo(); return true; }, false);

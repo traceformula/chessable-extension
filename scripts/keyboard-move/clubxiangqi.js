@@ -240,9 +240,25 @@
 			t: 'tables', j: 'Join!', o: 'Options',
 		},
 
+		// Actions that end or alter the game, and so are never one keystroke away.
+		// The label the client uses is not known for certain from the outside, so
+		// each lists the plausible spellings and the first one present wins.
+		confirmed: {
+			q: { verb: 'resign', labels: ['Resign', 'Resign!', 'resign'] },
+			'=': { verb: 'offer a draw', labels: ['Draw', 'Offer Draw', 'draw', 'Request Draw'] },
+		},
+
 		activate(label) {
 			const el = control(label);
 			return el ? clickElement(el) : false;
+		},
+
+		activateAny(labels) {
+			for (const label of labels) {
+				const el = control(label);
+				if (el) { clickElement(el); return label; }
+			}
+			return null;
 		},
 
 		focusChat() {

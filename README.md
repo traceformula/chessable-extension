@@ -82,6 +82,11 @@ cannot be part of one:
 | `o` | Options |
 | `/` | focus the chat line |
 | `Esc` | from chat, back to the board |
+| `q` | resign — asks for `Enter` first |
+| `=` | offer a draw — asks for `Enter` first |
+
+Resign and draw end or alter the game, so neither is ever one keystroke away:
+the key arms the action, `Enter` performs it, and any other key cancels.
 
 These are matched on the visible label, so if the client renames a control its
 shortcut reports `not found` rather than clicking something else.

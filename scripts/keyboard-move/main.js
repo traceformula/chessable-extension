@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.11.0';
+	ns.version = '1.12.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -80,6 +80,9 @@
 	// whether Enter would play it now or queue it as a premove.
 	let pending = null;
 	let pendingKind = 'move';
+	// An action that ends or alters the game, waiting on Enter. Never armed by
+	// the same keystroke that performs it.
+	let armed = null;
 	// After a commit the user is usually still typing the rest of the move they
 	// had in mind. Those leftover characters must not open a new buffer - on a
 	// position where "r" alone is unique, "Rxd2" would otherwise commit early and
@@ -98,6 +101,7 @@
 		buffer = '';
 		pending = null;
 		pendingKind = 'move';
+		armed = null;
 		tail = null;
 		ns.hud.hide();
 	}
@@ -281,6 +285,24 @@
 				return;
 			}
 
+			// Confirming or abandoning an armed action takes priority over anything
+			// else, so the key that arms it cannot also be read as a move.
+			if (armed) {
+				const action = armed;
+				armed = null;
+				if (e.key === 'Enter') {
+					e.preventDefault();
+					const used = site.activateAny(action.labels);
+					ns.hud.show('', { state: used ? 'unique' : 'none', candidates: [] },
+						used ? action.verb : 'no ' + action.verb + ' control found');
+					scheduleHide('message');
+					return;
+				}
+				ns.hud.show('', { state: 'empty', candidates: [] }, action.verb + ' cancelled');
+				scheduleHide('message');
+				if (e.key === 'Escape') { e.preventDefault(); return; }
+			}
+
 			// Lobby shortcuts. A move always begins with a file digit, so a letter
 			// typed with an empty buffer cannot be part of one and is free to mean
 			// something else. "/" focuses the chat line, as it does most places.
@@ -294,6 +316,16 @@
 					}
 					return;
 				}
+				const action = site.confirmed && site.confirmed[e.key.toLowerCase()];
+				if (action) {
+					e.preventDefault();
+					armed = action;
+					ns.hud.show('', { state: 'none', candidates: [] },
+						action.verb + '? enter to confirm, any other key to cancel');
+					scheduleHide('message');
+					return;
+				}
+
 				const label = site.controls && site.controls[e.key.toLowerCase()];
 				if (label) {
 					e.preventDefault();
@@ -312,6 +344,7 @@
 					'files 1-9  \u00b7  ranks A-J  \u00b7  backspace to correct  \u00b7  esc clear',
 					'\u2190 \u2192 step   \u2191 \u2193 first / last   /  chat   esc back to board',
 					'f findtable   r rooms   n new tables   t tables   j join   o options',
+					'q resign   = offer draw   \u2014 both ask for enter first',
 					'moves are checked by the server, not here',
 				]);
 				scheduleHide('help');

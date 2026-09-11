@@ -9,10 +9,29 @@
 	const adapter = ns.chesscom;
 	const { match, forms, canon } = ns.matcher;
 
-	ns.version = '1.3.1';
+	ns.version = '1.4.2';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
-	const IDLE_HIDE_MS = 1400;
+
+	// How long the overlay stays up, by what it is saying. A move confirmation is
+	// something you already knew you did, so it can go quickly; anything you have
+	// to read needs long enough to actually read it. Scale all of them with
+	// localStorage.setItem('kbm.hud.scale', '2') to slow the whole thing down.
+	const HOLD = {
+		typing: 6000,   // mid-input: the buffer must not vanish under you
+		played: 2500,   // "Nf3" - confirmation of something expected
+		message: 5000,  // errors and refusals, which carry a reason
+		help: 20000,    // the key list, which is there to be read
+	};
+
+	function hold(kind) {
+		let scale = 1;
+		try {
+			const raw = parseFloat(localStorage.getItem('kbm.hud.scale'));
+			if (raw > 0) scale = raw;
+		} catch (e) { /* storage blocked: default timing */ }
+		return HOLD[kind] * scale;
+	}
 
 	// A single character is never allowed to play a move, even when it already
 	// resolves uniquely. In sparse positions one letter can be unambiguous - with
@@ -52,14 +71,14 @@
 		ns.hud.hide();
 	}
 
-	function scheduleHide() {
+	function scheduleHide(kind) {
 		clearTimeout(hideTimer);
-		hideTimer = setTimeout(reset, IDLE_HIDE_MS);
+		hideTimer = setTimeout(reset, hold(kind || 'message'));
 	}
 
 	function render(result, note) {
 		ns.hud.show(buffer, result, note);
-		scheduleHide();
+		scheduleHide(result && result.state === 'none' ? 'message' : 'typing');
 	}
 
 	// Does `key` continue the move we just played? Punctuation canonicalises away
@@ -76,7 +95,7 @@
 		// mid-keystroke and should not have to wait on the board to catch up.
 		tail = { forms: forms(move), consumed: canon(raw) };
 		ns.hud.show(move.san, { state: 'unique', candidates: [] }, '');
-		scheduleHide();
+		scheduleHide('played');
 
 		// play() resolves only once the position has actually changed, so a move
 		// that went nowhere is reported rather than left looking successful.
@@ -84,7 +103,7 @@
 			if (played) return;
 			tail = null;
 			ns.hud.show(move.san, { state: 'none', candidates: [] }, 'not accepted');
-			scheduleHide();
+			scheduleHide('message');
 		});
 	}
 
@@ -93,8 +112,52 @@
 		if (editable(e.target)) return;
 		if (!adapter.isReady()) return;
 
+		// Navigation and retraction. None of these characters appear in algebraic
+		// notation, so they cannot collide with a move being typed.
+		const NAV = {
+			ArrowLeft: 'back', ArrowRight: 'forward',
+			ArrowUp: 'toStart', ArrowDown: 'toEnd',
+			Home: 'toStart', End: 'toEnd',
+		};
+		if (NAV[e.key]) {
+			e.preventDefault();
+			e.stopPropagation();
+			reset();
+			adapter[NAV[e.key]]();
+			return;
+		}
+
+		if (e.key === 'u') {
+			e.preventDefault();
+			reset();
+			if (adapter.undo()) {
+				ns.hud.show('', { state: 'unique', candidates: [] }, 'took back');
+			} else {
+				ns.hud.show('', { state: 'none', candidates: [] },
+					'no undo here - use the board takeback');
+			}
+			scheduleHide('message');
+			return;
+		}
+
+		if (e.key === '?') {
+			e.preventDefault();
+			ns.hud.show('', { state: 'empty', candidates: [] },
+				'type a move  \u00b7  \u2190\u2192 step  \u2191\u2193 start/end  \u00b7  u undo  \u00b7  esc clear');
+			scheduleHide('help');
+			return;
+		}
+
+		// Escape dismisses whatever is on screen, not just a half-typed move. The
+		// overlay itself is the usual reason to press it - help sits there for
+		// twenty seconds - and that case has no buffer to clear. The keypress is
+		// only swallowed when we actually had something to dismiss, so chess.com
+		// keeps Escape for closing its own dialogs.
 		if (e.key === 'Escape') {
-			if (buffer || tail) { e.preventDefault(); reset(); }
+			if (buffer || tail || pending || ns.hud.isOpen()) {
+				e.preventDefault();
+				reset();
+			}
 			return;
 		}
 
@@ -135,7 +198,7 @@
 			if (status.reason && status.reason !== 'not your turn') {
 				ns.hud.show('', { state: 'none', candidates: [] },
 					status.reason + ' - keyboard moves disabled');
-				scheduleHide();
+				scheduleHide('message');
 			}
 			return;
 		}
@@ -145,7 +208,7 @@
 			// Reachable on a board that has not finished setting up. Saying so beats
 			// both silence and a misleading "no such move".
 			ns.hud.show('', { state: 'none', candidates: [] }, 'board not ready');
-			scheduleHide();
+			scheduleHide('message');
 			return;
 		}
 

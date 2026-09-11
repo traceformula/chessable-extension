@@ -62,5 +62,8 @@
 		hide() {
 			if (el) el.dataset.open = '0';
 		},
+		isOpen() {
+			return !!el && el.dataset.open === '1';
+		},
 	};
 })();

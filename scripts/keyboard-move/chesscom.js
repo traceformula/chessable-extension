@@ -163,6 +163,31 @@
 			return false;
 		},
 
+		// Board navigation. These mirror the controls under the board and are safe
+		// anywhere: they move the view through the game, they do not alter it.
+		back() { const g = game(); return g ? safe(() => { g.moveBackward(); return true; }, false) : false; },
+		forward() { const g = game(); return g ? safe(() => { g.moveForward(); return true; }, false) : false; },
+		toStart() { const g = game(); return g ? safe(() => { g.selectLineStart(); return true; }, false) : false; },
+		toEnd() { const g = game(); return g ? safe(() => { g.selectLineEnd(); return true; }, false) : false; },
+
+		// Retracting a move is a different matter. game.undo() rewinds the local
+		// model only, so on a seated board it would leave us showing a position the
+		// server disagrees with. It is allowed where there is no server to
+		// contradict - analysis and other unseated boards - and refused elsewhere
+		// in favour of the site's own takeback, which negotiates properly.
+		canUndo() {
+			const g = game();
+			if (!g || typeof g.undo !== 'function') return false;
+			if (safe(() => g.getMode().usePlayingAs, false)) return false;
+			return safe(() => g.getHistorySANs().length > 0, false);
+		},
+
+		undo() {
+			const g = game();
+			if (!g || !this.canUndo()) return false;
+			return safe(() => { g.undo(); return true; }, false);
+		},
+
 		fen() {
 			const g = game();
 			return g ? safe(() => g.getFEN(), null) : null;

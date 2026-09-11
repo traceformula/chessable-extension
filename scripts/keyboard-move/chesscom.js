@@ -91,6 +91,7 @@
 
 	ns.chesscom = {
 		name: 'chess.com',
+		supportsPremove: true,
 
 		isReady() {
 			return !!game() && !!ns.Chess;

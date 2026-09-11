@@ -42,6 +42,7 @@
 
 	ns.chessable = {
 		name: 'chessable',
+		supportsPremove: false,
 
 		isReady() {
 			return !!app() && !!ns.Chess;

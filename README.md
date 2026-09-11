@@ -40,7 +40,7 @@ Input is forgiving:
 | `←` `→` | step back / forward one move |
 | `↑` `↓` (`Home` `End`) | jump to start / end of the line |
 | `u` | take back a move |
-| `?` | show the key list |
+| `?` | show the keys, and whether premoves are on |
 | `Esc` | clear what you have typed, or dismiss the overlay |
 
 Typing is ignored when it is not your turn, when the focus is in a text field
@@ -63,7 +63,8 @@ Step back with the arrows instead.
 
 ### Premoves
 
-Off by default; switch them on in the popup. With them on, typing during the
+Off by default; switch them on in the popup — click the extension's toolbar
+icon. Pressing `?` on the board says which way they are currently set. With them on, typing during the
 opponent's turn builds a premove instead of being ignored, and **Enter** queues
 it — a premove never fires on its own, because it plays the instant the
 opponent replies and cannot be taken back. `Esc` cancels one already queued.

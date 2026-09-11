@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.9.0';
+	ns.version = '1.9.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -210,17 +210,19 @@
 
 		if (e.key === '?') {
 			e.preventDefault();
-			ns.hud.show('', { state: 'empty', candidates: [] },
-				'type a move  \u00b7  \u2190\u2192 step  \u2191\u2193 start/end  \u00b7  u undo  \u00b7  esc clear');
+			const premoves = site.supportsPremove === true;
+			ns.hud.help([
+				'type a move:  e4  \u00b7  nf3  \u00b7  nxd4  \u00b7  oo  \u00b7  e8  \u00b7  r8xg6',
+				'\u2190 \u2192 step   \u2191 \u2193 start / end   u take back   esc clear',
+				!premoves ? 'premoves: not available on this board'
+					: settings.premove
+						? 'premoves: on \u2014 type on the opponent\u2019s turn, enter to queue'
+						: 'premoves: off \u2014 turn on in the extension popup (toolbar icon)',
+			]);
 			scheduleHide('help');
 			return;
 		}
 
-		// Escape dismisses whatever is on screen, not just a half-typed move. The
-		// overlay itself is the usual reason to press it - help sits there for
-		// twenty seconds - and that case has no buffer to clear. The keypress is
-		// only swallowed when we actually had something to dismiss, so chess.com
-		// keeps Escape for closing its own dialogs.
 		if (e.key === 'Escape') {
 			const queued = site.premoveQueue ? site.premoveQueue() : [];
 			if (queued && queued.length) {
@@ -281,7 +283,7 @@
 		if (!status.playable) {
 			// The opponent's turn is exactly when a premove is typed. Off unless
 			// switched on, and it never fires on its own - Enter queues it.
-			if (status.reason === 'not your turn' && settings.premove) {
+			if (status.reason === 'not your turn' && settings.premove && site.supportsPremove) {
 				const candidates = site.premoveMoves ? site.premoveMoves() : [];
 				if (candidates.length) { premoveKey(e, candidates); return; }
 			}

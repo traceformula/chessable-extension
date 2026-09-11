@@ -21,6 +21,10 @@
 .kbm-cands { display: flex; gap: 7px; opacity: .78; font-size: 13px; }
 .kbm-cands span { padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.12); }
 .kbm-note { opacity: .7; font-size: 13px; }
+.kbm-hud[data-mode="help"] { flex-direction: column; align-items: flex-start; gap: 5px; max-width: min(92vw, 620px); }
+.kbm-hud[data-mode="help"] .kbm-line { font-size: 12.5px; line-height: 1.5; white-space: normal; }
+.kbm-hud[data-mode="help"] .kbm-line:first-child { opacity: 1; }
+.kbm-hud[data-mode="help"] .kbm-line { opacity: .8; }
 `;
 
 	let el, bufEl, candsEl, noteEl;
@@ -46,6 +50,8 @@
 	ns.hud = {
 		show(buffer, result, note) {
 			build();
+			for (const row of [...el.querySelectorAll('.kbm-line')]) row.remove();
+			delete el.dataset.mode;
 			el.dataset.open = '1';
 			el.dataset.state = result ? result.state : 'empty';
 			bufEl.textContent = buffer;
@@ -57,6 +63,24 @@
 					s.textContent = m.san;
 					candsEl.appendChild(s);
 				}
+			}
+		},
+		// Help is laid out as stacked lines rather than the single row the overlay
+		// normally uses: it is the one thing here meant to be read rather than
+		// glanced at.
+		help(lines) {
+			build();
+			el.dataset.open = '1';
+			el.dataset.state = 'empty';
+			el.dataset.mode = 'help';
+			bufEl.textContent = '';
+			candsEl.textContent = '';
+			noteEl.textContent = '';
+			for (const text of lines) {
+				const row = document.createElement('div');
+				row.className = 'kbm-line';
+				row.textContent = text;
+				el.insertBefore(row, noteEl);
 			}
 		},
 		hide() {

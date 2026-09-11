@@ -1,9 +1,10 @@
 {
   "name": "chess-utility-extension",
-  "version": "1.2.0",
+  "version": "1.5.0",
   "private": true,
   "description": "Chrome extension: keyboard move input for chess.com, plus Chessable helpers",
   "scripts": {
-    "test": "node test/matcher.test.js && node test/engine.test.js"
+    "test": "node test/matcher.test.js && node test/engine.test.js",
+    "package": "bash tools/package.sh"
   }
 }

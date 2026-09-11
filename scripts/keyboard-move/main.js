@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.12.1';
+	ns.version = '1.13.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -356,11 +356,13 @@
 						['/', 'type in chat'],
 						['esc', 'leave chat, or clear what you typed'],
 					] },
-					{ group: 'Game', rows: [
-						['q', 'resign \u2014 then enter to confirm'],
-						['=', 'offer a draw \u2014 then enter to confirm'],
+					{ group: 'Table', rows: [
+						['q', 'resign'],
+						['=', 'offer a draw'],
+						['u', 'unsit'],
+						['x', 'reset the board'],
 					] },
-					'Lobby and game keys work only when no move is half-typed. Moves are checked by the server, not here.',
+					'Table keys ask for enter before doing anything. Lobby keys work only when no move is half-typed. Moves are checked by the server, not here.',
 				]);
 				scheduleHide('help');
 				return;

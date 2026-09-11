@@ -246,6 +246,8 @@
 		confirmed: {
 			q: { verb: 'resign', labels: ['Resign', 'Resign!', 'resign'] },
 			'=': { verb: 'offer a draw', labels: ['Draw', 'Offer Draw', 'draw', 'Request Draw'] },
+			u: { verb: 'unsit', labels: ['Unsit', 'unsit', 'Unsit!', 'Stand', 'Stand Up', 'Leave'] },
+			x: { verb: 'reset the board', labels: ['Reset', 'reset', 'Reset!', 'Reset Board', 'New'] },
 		},
 
 		activate(label) {

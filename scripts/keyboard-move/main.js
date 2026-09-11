@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.12.0';
+	ns.version = '1.12.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -340,12 +340,27 @@
 			if (e.key === '?') {
 				e.preventDefault();
 				ns.hud.help([
-					'type two squares: file, rank, file, rank  \u2014  e.g. 5E5A',
-					'files 1-9  \u00b7  ranks A-J  \u00b7  backspace to correct  \u00b7  esc clear',
-					'\u2190 \u2192 step   \u2191 \u2193 first / last   /  chat   esc back to board',
-					'f findtable   r rooms   n new tables   t tables   j join   o options',
-					'q resign   = offer draw   \u2014 both ask for enter first',
-					'moves are checked by the server, not here',
+					{ group: 'Move', rows: [
+						['5E5A', 'two squares \u2014 file, rank, file, rank'],
+						['1-9', 'files, left to right as labelled'],
+						['A-J', 'ranks, bottom to top as labelled'],
+						['backspace', 'correct the last character'],
+					] },
+					{ group: 'Board', rows: [
+						[['\u2190', '\u2192'], 'step back and forward one move'],
+						[['\u2191', '\u2193'], 'jump to the first or last move'],
+					] },
+					{ group: 'Lobby', rows: [
+						['f', 'findtable'], ['r', 'rooms'], ['n', 'new tables'],
+						['t', 'tables'], ['j', 'join'], ['o', 'options'],
+						['/', 'type in chat'],
+						['esc', 'leave chat, or clear what you typed'],
+					] },
+					{ group: 'Game', rows: [
+						['q', 'resign \u2014 then enter to confirm'],
+						['=', 'offer a draw \u2014 then enter to confirm'],
+					] },
+					'Lobby and game keys work only when no move is half-typed. Moves are checked by the server, not here.',
 				]);
 				scheduleHide('help');
 				return;
@@ -386,12 +401,28 @@
 			e.preventDefault();
 			const premoves = site.supportsPremove === true;
 			ns.hud.help([
-				'type a move:  e4  \u00b7  nf3  \u00b7  nxd4  \u00b7  oo  \u00b7  e8  \u00b7  r8xg6',
-				'\u2190 \u2192 step   \u2191 \u2193 start / end   u take back   esc clear',
-				!premoves ? 'premoves: not available on this board'
-					: settings.premove
-						? 'premoves: on \u2014 type on the opponent\u2019s turn, enter to queue'
-						: 'premoves: off \u2014 turn on in the extension popup (toolbar icon)',
+				{ group: 'Move', rows: [
+					[['e4', 'nf3'], 'plays as soon as it can be nothing else'],
+					[['nxd4', 'nd4'], 'the x is optional'],
+					[['oo', 'ooo'], 'castle short or long'],
+					[['e8', 'e8n'], 'promote to a queen, or name the piece'],
+					['R8xg6', 'any disambiguator that names the origin'],
+					['enter', 'play the move shown'],
+					[['backspace', 'esc'], 'correct, or clear'],
+				] },
+				{ group: 'Board', rows: [
+					[['\u2190', '\u2192'], 'step back and forward one move'],
+					[['\u2191', '\u2193'], 'jump to the start or end of the line'],
+					['u', 'take back a move'],
+				] },
+				{ group: 'Premoves', rows: [[
+					premoves ? (settings.premove ? 'on' : 'off') : 'n/a',
+					!premoves ? 'not available on this board'
+						: settings.premove
+							? 'type on the opponent\u2019s turn, enter to queue'
+							: 'turn on in the extension popup (toolbar icon)',
+				]] },
+				'A move never plays on one keystroke, nor before its destination square is complete.',
 			]);
 			scheduleHide('help');
 			return;

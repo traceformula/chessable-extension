@@ -61,6 +61,22 @@ only: Chessable has no app-level retract to call, and rolling the position
 back by hand would leave its move list showing a move that is no longer there.
 Step back with the arrows instead.
 
+### Premoves
+
+Off by default; switch them on in the popup. With them on, typing during the
+opponent's turn builds a premove instead of being ignored, and **Enter** queues
+it — a premove never fires on its own, because it plays the instant the
+opponent replies and cannot be taken back. `Esc` cancels one already queued.
+
+Premove candidates come from chess.com rather than from our own move
+generation, since the position a premove applies to does not exist yet: a
+recapture is illegal until the opponent has played the capture. The list is
+checked against the colour you are seated as before it is used, and premoves
+are simply unavailable if it does not match.
+
+chess.com executes the queued move itself, so there is no added delay.
+Chessable explore boards have no opponent and no premoves.
+
 ### Settings
 
 Click the extension's toolbar icon. Two settings, both stored in
@@ -70,6 +86,7 @@ Click the extension's toolbar icon. Two settings, both stored in
   only on Enter. Enter is worth trying if auto-play catches you out; a typo
   that happens to be legal is played immediately otherwise.
 - **Overlay duration** — how long messages stay on the board.
+- **Premoves** — see above. Off by default.
 
 A move is never played on a single keystroke, even when one letter already
 resolves uniquely, since that is indistinguishable from a stray keypress.

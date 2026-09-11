@@ -224,6 +224,61 @@
 			return safe(() => { g.undo(); return true; }, false);
 		},
 
+		// Which colour we are seated as, or null when that cannot be established.
+		seat() {
+			const g = game();
+			if (!g) return null;
+			const as = safe(() => g.getPlayingAs(), null);
+			if (as === 1 || as === 2) return as;
+			const flipped = safe(() => g.getOptions().flipped, null);
+			if (flipped === true) return 2;
+			if (flipped === false) return 1;
+			return null;
+		},
+
+		// Premoves come from chess.com rather than our own generator, because the
+		// position they apply to does not exist yet: a recapture premove is
+		// illegal until the opponent has played the capture. chess.com computes
+		// that relaxed set already, and returns it in the same shape as a normal
+		// move list, so the matcher needs no special case.
+		//
+		// The list is checked against our seat before being used. getLegalMoves()
+		// has served the wrong colour's moves on a live board before, and offering
+		// the opponent's moves as premoves would be worse than offering none.
+		premoveMoves() {
+			const g = game();
+			if (!g || !g.premoves) return [];
+			const list = safe(() => g.premoves.getLegalMoves(), []) || [];
+			if (!list.length) return [];
+			const seat = this.seat();
+			if (!seat) return [];
+			if (list.some(m => m.color === 1 || m.color === 2) &&
+				!list.every(m => m.color === seat)) {
+				return [];
+			}
+			return list.map(m => ({
+				san: m.san, from: m.from, to: m.to, promotion: m.promotion,
+			}));
+		},
+
+		premove(move) {
+			const g = game();
+			if (!g || !g.premoves) return false;
+			return safe(() => { g.premoves.move(move.from, move.to); return true; }, false);
+		},
+
+		cancelPremove() {
+			const g = game();
+			if (!g || !g.premoves) return false;
+			return safe(() => { g.premoves.cancel(); return true; }, false);
+		},
+
+		premoveQueue() {
+			const g = game();
+			if (!g || !g.premoves) return [];
+			return safe(() => g.premoves.getQueue(), []) || [];
+		},
+
 		fen() {
 			const g = game();
 			return g ? safe(() => g.getFEN(), null) : null;

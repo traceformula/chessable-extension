@@ -90,6 +90,12 @@
 		canUndo() { return false; },
 		undo() { return false; },
 
+		// An explore board has no opponent, so there is nothing to premove against.
+		premoveMoves() { return []; },
+		premove() { return false; },
+		cancelPremove() { return false; },
+		premoveQueue() { return []; },
+
 		fen() {
 			const w = app();
 			return w ? safe(() => w.game.fen(), null) : null;

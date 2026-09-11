@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.8.1';
+	ns.version = '1.9.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -48,7 +48,7 @@
 	// Settings arrive from the extension's storage by way of the isolated-world
 	// bridge, since this script cannot reach chrome.storage itself. Defaults apply
 	// until the first message lands, so nothing waits on it.
-	const settings = { commit: 'auto', hudScale: 1 };
+	const settings = { commit: 'auto', hudScale: 1, premove: false };
 	const CHANNEL = 'kbm-settings';
 
 	window.addEventListener('message', e => {
@@ -61,6 +61,7 @@
 		if (next.commit === 'auto' || next.commit === 'enter') settings.commit = next.commit;
 		const scale = Number(next.hudScale);
 		if (scale > 0) settings.hudScale = scale;
+		settings.premove = next.premove === true;
 	});
 	window.postMessage({ channel: CHANNEL + '-request' }, window.location.origin);
 
@@ -70,8 +71,10 @@
 
 	let buffer = '';
 	// A resolved move held back for confirmation, either because Enter is required
-	// or because too few keys have been typed to auto-play.
+	// or because too few keys have been typed to auto-play. `pendingKind` says
+	// whether Enter would play it now or queue it as a premove.
 	let pending = null;
+	let pendingKind = 'move';
 	// After a commit the user is usually still typing the rest of the move they
 	// had in mind. Those leftover characters must not open a new buffer - on a
 	// position where "r" alone is unique, "Rxd2" would otherwise commit early and
@@ -89,6 +92,7 @@
 	function reset() {
 		buffer = '';
 		pending = null;
+		pendingKind = 'move';
 		tail = null;
 		ns.hud.hide();
 	}
@@ -129,6 +133,40 @@
 			ns.hud.show(move.san, { state: 'none', candidates: [] }, 'not accepted');
 			scheduleHide('message');
 		});
+	}
+
+	// Premove input. Deliberately never commits by itself: the move fires the
+	// instant the opponent replies, and a mistyped one cannot be taken back.
+	function premoveKey(e, moves) {
+		if (e.key === 'Backspace') {
+			if (!buffer) return;
+			e.preventDefault();
+			buffer = buffer.slice(0, -1);
+			pending = null;
+			if (!buffer) return reset();
+			render(match(buffer, moves), 'premove');
+			return;
+		}
+		if (!ACCEPTS.test(e.key)) return;
+
+		const next = buffer + e.key;
+		const result = match(next, moves);
+		if (result.state === 'none') {
+			e.preventDefault();
+			render({ state: 'none', candidates: [] }, 'no such premove');
+			return;
+		}
+
+		e.preventDefault();
+		buffer = next;
+		if (result.state === 'unique') {
+			pending = result.move;
+			pendingKind = 'premove';
+			render(result, result.move.san + ' - enter to premove');
+			return;
+		}
+		pending = null;
+		render(result, 'premove');
 	}
 
 	function onKey(e) {
@@ -184,6 +222,15 @@
 		// only swallowed when we actually had something to dismiss, so chess.com
 		// keeps Escape for closing its own dialogs.
 		if (e.key === 'Escape') {
+			const queued = site.premoveQueue ? site.premoveQueue() : [];
+			if (queued && queued.length) {
+				e.preventDefault();
+				site.cancelPremove();
+				reset();
+				ns.hud.show('', { state: 'none', candidates: [] }, 'premove cancelled');
+				scheduleHide('message');
+				return;
+			}
 			if (buffer || tail || pending || ns.hud.isOpen()) {
 				e.preventDefault();
 				reset();
@@ -194,6 +241,17 @@
 		if (e.key === 'Enter') {
 			if (!pending) return;
 			e.preventDefault();
+			if (pendingKind === 'premove') {
+				const queued = site.premove(pending);
+				ns.hud.show(pending.san,
+					{ state: queued ? 'unique' : 'none', candidates: [] },
+					queued ? 'premove queued' : 'premove refused');
+				buffer = '';
+				pending = null;
+				pendingKind = 'move';
+				scheduleHide('message');
+				return;
+			}
 			commit(pending, buffer);
 			return;
 		}
@@ -221,6 +279,12 @@
 		// swallowed here, so chess.com keeps its own shortcuts on boards we sit out.
 		const status = site.status();
 		if (!status.playable) {
+			// The opponent's turn is exactly when a premove is typed. Off unless
+			// switched on, and it never fires on its own - Enter queues it.
+			if (status.reason === 'not your turn' && settings.premove) {
+				const candidates = site.premoveMoves ? site.premoveMoves() : [];
+				if (candidates.length) { premoveKey(e, candidates); return; }
+			}
 			if (buffer) reset();
 			// "not your turn" is the normal resting state and needs no commentary,
 			// but a board that cannot submit at all should say so - that failure
@@ -260,6 +324,7 @@
 				isComplete(next) && !isExtendable(next, result.move, moves);
 			if (requiresEnter() || !safeToPlay) {
 				pending = result.move;
+				pendingKind = 'move';
 				render(result, result.move.san + ' - enter to play');
 				return;
 			}

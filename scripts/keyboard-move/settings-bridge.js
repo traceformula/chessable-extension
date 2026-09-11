@@ -5,7 +5,7 @@
 // to chrome.storage. This script runs in the isolated world, where the reverse is
 // true, and hands settings across by postMessage.
 (function () {
-	const DEFAULTS = { commit: 'auto', hudScale: 1 };
+	const DEFAULTS = { commit: 'auto', hudScale: 1, premove: false };
 	const CHANNEL = 'kbm-settings';
 
 	function push() {

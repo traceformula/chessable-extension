@@ -2,15 +2,18 @@
   "manifest_version": 3,
   "name": "Chess Utility Extension",
   "description": "Keyboard move input for chess.com, plus Chessable helpers",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
+  "permissions": [
+    "storage"
+  ],
   "action": {
-    "default_popup": "main.html",
+    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "32": "icons/icon32.png",
@@ -41,6 +44,15 @@
         "https://www.chess.com/*"
       ],
       "world": "MAIN",
+      "run_at": "document_start"
+    },
+    {
+      "js": [
+        "scripts/keyboard-move/settings-bridge.js"
+      ],
+      "matches": [
+        "https://www.chess.com/*"
+      ],
       "run_at": "document_start"
     }
   ]

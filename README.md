@@ -44,14 +44,19 @@ clock keeps running.
 
 ### Settings
 
-Set these in the console on a chess.com page; they persist per browser.
+Click the extension's toolbar icon. Two settings, both stored in
+`chrome.storage.sync` so they follow your Chrome profile to other machines:
 
-```js
-localStorage.setItem('kbm.commit', 'enter')   // require Enter for every move
-localStorage.setItem('kbm.hud.scale', '2')    // keep the overlay up twice as long
-```
+- **Commit a move** — automatically as soon as the input is unambiguous, or
+  only on Enter. Enter is worth trying if auto-play catches you out; a typo
+  that happens to be legal is played immediately otherwise.
+- **Overlay duration** — how long messages stay on the board.
 
-Remove either key to go back to the default.
+A move is never played on a single keystroke, even when one letter already
+resolves uniquely, since that is indistinguishable from a stray keypress.
+
+Changing a setting applies to chess.com tabs opened afterwards; reload an
+open tab to pick it up.
 
 ## Installing
 
@@ -59,6 +64,9 @@ Unpacked, for development or a single machine:
 
 1. `chrome://extensions` → enable **Developer mode**
 2. **Load unpacked** → choose this directory
+
+The only permission requested is `storage`, for the settings above. No data
+leaves the browser.
 
 After changing any file you must reload the extension *and* refresh the page:
 reloading alone re-registers the extension, but tabs keep the content scripts

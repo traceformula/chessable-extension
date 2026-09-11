@@ -9,14 +9,14 @@
 	const adapter = ns.chesscom;
 	const { match, forms, canon } = ns.matcher;
 
-	ns.version = '1.5.0';
+	ns.version = '1.6.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
 	// How long the overlay stays up, by what it is saying. A move confirmation is
 	// something you already knew you did, so it can go quickly; anything you have
-	// to read needs long enough to actually read it. Scale all of them with
-	// localStorage.setItem('kbm.hud.scale', '2') to slow the whole thing down.
+	// to read needs long enough to actually read it. All of them scale together
+	// with the overlay setting.
 	const HOLD = {
 		typing: 6000,   // mid-input: the buffer must not vanish under you
 		played: 2500,   // "Nf3" - confirmation of something expected
@@ -25,12 +25,7 @@
 	};
 
 	function hold(kind) {
-		let scale = 1;
-		try {
-			const raw = parseFloat(localStorage.getItem('kbm.hud.scale'));
-			if (raw > 0) scale = raw;
-		} catch (e) { /* storage blocked: default timing */ }
-		return HOLD[kind] * scale;
+		return HOLD[kind] * settings.hudScale;
 	}
 
 	// A single character is never allowed to play a move, even when it already
@@ -39,11 +34,27 @@
 	// the first keystroke is indistinguishable from a stray keypress.
 	const MIN_AUTO_KEYS = 2;
 
-	// Opt in with localStorage.setItem('kbm.commit', 'enter') to require Enter for
-	// every move instead of playing as soon as the input is unambiguous.
+	// Settings arrive from the extension's storage by way of the isolated-world
+	// bridge, since this script cannot reach chrome.storage itself. Defaults apply
+	// until the first message lands, so nothing waits on it.
+	const settings = { commit: 'auto', hudScale: 1 };
+	const CHANNEL = 'kbm-settings';
+
+	window.addEventListener('message', e => {
+		// Only same-window messages on our channel: the page can post too, and it
+		// has no business changing how moves commit.
+		if (e.source !== window) return;
+		const data = e.data;
+		if (!data || data.channel !== CHANNEL || !data.settings) return;
+		const next = data.settings;
+		if (next.commit === 'auto' || next.commit === 'enter') settings.commit = next.commit;
+		const scale = Number(next.hudScale);
+		if (scale > 0) settings.hudScale = scale;
+	});
+	window.postMessage({ channel: CHANNEL + '-request' }, window.location.origin);
+
 	function requiresEnter() {
-		try { return localStorage.getItem('kbm.commit') === 'enter'; }
-		catch (e) { return false; }
+		return settings.commit === 'enter';
 	}
 
 	let buffer = '';

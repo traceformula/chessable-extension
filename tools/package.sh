@@ -11,7 +11,8 @@ mkdir -p dist
 rm -f "$out"
 zip -q -r "$out" \
   manifest.json \
-  main.html \
+  popup.html \
+  popup.js \
   icons \
   scripts \
   -x '*.DS_Store'

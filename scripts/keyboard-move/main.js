@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.9.1';
+	ns.version = '1.10.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -140,6 +140,72 @@
 		});
 	}
 
+	// Coordinate input, for boards where a move is typed as two squares rather
+	// than as notation: file, rank, file, rank - "5e5a". Used where resolving
+	// notation would need a move generator we do not have, so legality is left to
+	// the server exactly as it is for a mouse move.
+	const COORD_FILE = /^[1-9]$/;
+	const COORD_RANK = /^[a-jA-J]$/;
+
+	function coordKey(e, site) {
+		if (e.key === 'Backspace') {
+			if (!buffer) return;
+			e.preventDefault();
+			buffer = buffer.slice(0, -1);
+			if (!buffer) return reset();
+			ns.hud.show(buffer.toUpperCase(), { state: 'empty', candidates: [] }, 'square');
+			scheduleHide('typing');
+			return;
+		}
+
+		// Squares alternate file then rank, so only one kind of character can come
+		// next. A separator is allowed and ignored, so "5e-5a" reads too.
+		if (e.key === '-' && buffer.length === 2) { e.preventDefault(); return; }
+		const wantsFile = buffer.length % 2 === 0;
+		const ok = wantsFile ? COORD_FILE.test(e.key) : COORD_RANK.test(e.key);
+		if (!ok) {
+			if (!/^[0-9a-zA-Z]$/.test(e.key)) return;
+			e.preventDefault();
+			ns.hud.show(buffer.toUpperCase(), { state: 'none', candidates: [] },
+				wantsFile ? 'expecting a file, 1-9' : 'expecting a rank, A-J');
+			scheduleHide('message');
+			return;
+		}
+
+		e.preventDefault();
+		const next = buffer + e.key.toUpperCase();
+
+		// Reject an origin with nothing on it, rather than clicking an empty square.
+		if (next.length === 2 && !site.occupied(next[0], next[1])) {
+			ns.hud.show(next, { state: 'none', candidates: [] }, 'no piece there');
+			scheduleHide('message');
+			return;
+		}
+
+		buffer = next;
+		if (buffer.length < 4) {
+			ns.hud.show(buffer, { state: 'empty', candidates: [] },
+				buffer.length === 2 ? 'to \u2026' : 'square');
+			scheduleHide('typing');
+			return;
+		}
+
+		const move = {
+			fromFile: buffer[0], fromRank: buffer[1],
+			toFile: buffer[2], toRank: buffer[3],
+			san: buffer.slice(0, 2) + '-' + buffer.slice(2),
+		};
+		const label = move.san;
+		buffer = '';
+		ns.hud.show(label, { state: 'unique', candidates: [] }, '');
+		scheduleHide('played');
+		Promise.resolve(site.play(move)).then(played => {
+			if (played) return;
+			ns.hud.show(label, { state: 'none', candidates: [] }, 'not accepted');
+			scheduleHide('message');
+		});
+	}
+
 	// Premove input. Deliberately never commits by itself: the move fires the
 	// instant the opponent replies, and a mistyped one cannot be taken back.
 	function premoveKey(e, moves) {
@@ -184,6 +250,25 @@
 		if (editable(e.target)) return;
 		const site = adapter();
 		if (!site) return;
+
+		if (site.inputMode === 'coords') {
+			if (e.key === 'Escape') {
+				if (buffer || ns.hud.isOpen()) { e.preventDefault(); reset(); }
+				return;
+			}
+			if (e.key === '?') {
+				e.preventDefault();
+				ns.hud.help([
+					'type two squares: file, rank, file, rank  \u2014  e.g. 5E5A',
+					'files 1-9  \u00b7  ranks A-J  \u00b7  backspace to correct  \u00b7  esc clear',
+					'moves are checked by the server, not here',
+				]);
+				scheduleHide('help');
+				return;
+			}
+			coordKey(e, site);
+			return;
+		}
 
 		// Navigation and retraction. None of these characters appear in algebraic
 		// notation, so they cannot collide with a move being typed.

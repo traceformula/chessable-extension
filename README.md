@@ -2,8 +2,8 @@
 
 A Chrome extension with two conveniences:
 
-- **Keyboard move input** — play by typing algebraic notation instead of
-  dragging pieces, on chess.com boards and Chessable explore boards.
+- **Keyboard move input** — play by typing instead of dragging pieces, on
+  chess.com boards, Chessable explore boards, and clubxiangqi.com.
 - **Find position in course** — on a Chessable explore page, jump to the
   current position inside the course.
 
@@ -47,6 +47,23 @@ Typing is ignored when it is not your turn, when the focus is in a text field
 so chat still works, and on boards you are only observing — those accept a
 move locally without ever submitting it, which looks like a played move whose
 clock keeps running.
+
+### Xiangqi (clubxiangqi.com)
+
+Moves are typed as two squares — file, rank, file, rank, so `5E5A` — rather
+than as notation. `?` shows the same reminder on the board.
+
+That is a deliberate limit, not an oversight. The CXQ client is a GWT
+application with no usable JavaScript API, so the adapter reads the board from
+the DOM and plays by clicking squares. Resolving piece-relative notation such
+as `C2.5` would mean writing a xiangqi move generator — horse-leg and
+elephant-eye blocking, cannon screens, palace, river, flying general — and
+naming both squares needs none of it. Legality is left to the server, exactly
+as it is for a mouse move.
+
+The board geometry is read from the page's own file and rank labels at
+runtime, so a board drawn from the other side resolves without a special case.
+Navigation, takeback and premoves are not available there.
 
 ### Site differences
 

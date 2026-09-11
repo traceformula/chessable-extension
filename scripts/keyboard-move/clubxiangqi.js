@@ -108,20 +108,40 @@
 	}
 
 	// The client's own move-navigation controls, identified by the labels it
-	// draws on them. There is no id or stable class to match instead - every
-	// symbol in a GWT build is minified - so the visible text is the handle.
+	// draws on them. A GWT build leaves no id or stable class to match instead.
 	const NAV_LABEL = { toStart: '<<', back: '<', forward: '>', toEnd: '>>' };
 
-	function navButton(which) {
-		const label = NAV_LABEL[which];
-		for (const el of document.querySelectorAll('button, a, div, span, td')) {
+	function labelled(text, scope) {
+		for (const el of (scope || document).querySelectorAll('button, a, div, span, td')) {
 			if (el.children.length) continue;
-			if ((el.textContent || '').trim() !== label) continue;
+			if ((el.textContent || '').trim() !== text) continue;
 			const r = el.getBoundingClientRect();
-			if (r.width < 8 || r.height < 8) continue;   // skip anything not drawn
+			if (r.width < 8 || r.height < 8) continue;   // not painted
 			return el;
 		}
 		return null;
+	}
+
+	// Locate the control strip before looking for a single chevron in it.
+	//
+	// "<" and ">" are one character and turn up all over a page - the first match
+	// in document order was landing in the chat panel, so pressing the right arrow
+	// moved focus there instead of stepping a move. The doubled "<<" and ">>" are
+	// far more distinctive, so the strip is found from those and the single
+	// chevrons are then only looked for inside it.
+	function navGroup() {
+		const first = labelled('<<');
+		const last = labelled('>>');
+		if (!first || !last) return null;
+		let node = first;
+		while (node && !node.contains(last)) node = node.parentElement;
+		return node;
+	}
+
+	function navButton(which) {
+		const scope = navGroup();
+		if (!scope) return null;
+		return labelled(NAV_LABEL[which], scope);
 	}
 
 	function navigate(which) {

@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.10.1';
+	ns.version = '1.10.2';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -256,7 +256,10 @@
 				ArrowUp: 'toStart', ArrowDown: 'toEnd', Home: 'toStart', End: 'toEnd' };
 			if (nav[e.key]) {
 				e.preventDefault();
-				e.stopPropagation();
+				// This client binds the arrows itself - the right arrow moves focus
+				// to chat - and stopPropagation alone does not reach a listener
+				// registered on the same target.
+				e.stopImmediatePropagation();
 				reset();
 				if (!site[nav[e.key]]()) {
 					ns.hud.show('', { state: 'none', candidates: [] }, 'no navigation here');

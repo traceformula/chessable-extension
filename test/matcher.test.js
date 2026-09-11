@@ -143,6 +143,47 @@ test('live puzzle position resolves as expected', () => {
 	assert.strictEqual(match('kc6', PUZZLE).move.san, 'Kc6');
 });
 
+// Rooks on g8 and b6, both able to capture on g6. SAN disambiguates by file
+// ("Rgxg6"), but a person may just as reasonably think "the rook on rank 8".
+const TWO_ROOKS = [
+	mv('Rgxg6','g8','g6'), mv('Rbxg6','b6','g6'),
+	mv('Rg7','g8','g7'), mv('Rb7','b6','b7'), mv('Rxb4','b6','b4'),
+];
+
+test('any disambiguator that identifies the origin is accepted', () => {
+	for (const s of ['rgxg6', 'r8xg6', 'rg8xg6', 'r8g6', 'rgg6']) {
+		const r = match(s, TWO_ROOKS);
+		assert.strictEqual(r.state, 'unique', s + ' -> ' + r.state);
+		assert.strictEqual(r.move.san, 'Rgxg6', s);
+	}
+});
+
+test('the other rook is reachable by its own file or rank', () => {
+	assert.strictEqual(match('rbxg6', TWO_ROOKS).move.san, 'Rbxg6');
+	assert.strictEqual(match('r6xg6', TWO_ROOKS).move.san, 'Rbxg6');
+	assert.strictEqual(match('rb6xg6', TWO_ROOKS).move.san, 'Rbxg6');
+});
+
+test('an undisambiguated capture still reports the tie', () => {
+	const r = match('rxg6', TWO_ROOKS);
+	assert.strictEqual(r.state, 'ambiguous');
+	assert.deepStrictEqual(r.candidates.map(m => m.san).sort(), ['Rbxg6', 'Rgxg6']);
+});
+
+test('origin hints do not leak into pawn moves', () => {
+	// "exd5" must not become reachable as "d5", which is a different move.
+	const moves = [mv('exd5','e4','d5'), mv('d5','d4','d5')];
+	const r = match('d5', moves);
+	assert.strictEqual(r.state, 'unique');
+	assert.strictEqual(r.move.san, 'd5');
+});
+
+test('origin hints survive promotion suffixes', () => {
+	const moves = [mv('Nge7','g8','e7'), mv('Nce7','c6','e7')];
+	assert.strictEqual(match('n8e7', moves).move.san, 'Nge7');
+	assert.strictEqual(match('n6e7', moves).move.san, 'Nce7');
+});
+
 // The tail-absorption rule in main.js is built from forms()/canon(), so the
 // cases that motivated it are pinned here.
 const { forms } = require('../scripts/keyboard-move/matcher.js');

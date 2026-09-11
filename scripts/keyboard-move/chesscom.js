@@ -92,12 +92,22 @@
 			if (name && READ_ONLY_MODE.test(name)) return { playable: false, reason: name };
 
 			// Analysis-style boards have no seat and let you move both colours.
-			const seated = safe(() =>
-				typeof g.usePlayingAs === 'function' ? g.usePlayingAs() : !!g.usePlayingAs, false);
+			// The seat flag has to come off the mode descriptor: the same-named
+			// game.usePlayingAs() returns undefined on boards that are certainly
+			// seated, which made every board look like an analysis board and let
+			// typing through on the opponent's turn.
+			const seated = safe(() => g.getMode().usePlayingAs, false);
 			if (!seated) return { playable: true, reason: null };
 
-			const playingAs = safe(() => g.getPlayingAs(), null);
-			if (playingAs !== 1 && playingAs !== 2) return { playable: false, reason: 'no seat' };
+			// getPlayingAs() is also intermittently undefined on a seated board, so
+			// fall back to which way the board is facing.
+			let playingAs = safe(() => g.getPlayingAs(), null);
+			if (playingAs !== 1 && playingAs !== 2) {
+				const flipped = safe(() => g.getOptions().flipped, null);
+				if (flipped === true) playingAs = 2;
+				else if (flipped === false) playingAs = 1;
+				else return { playable: false, reason: 'no seat' };
+			}
 
 			// Side to move comes from the FEN, which stayed correct on every board
 			// where getLegalMoves() did not.
@@ -123,45 +133,34 @@
 		// move still lands in the model and animates, but the surrounding mode
 		// plugin treats it as a replayed move - which is how a move can appear on
 		// the board while the server never hears about it.
-		// Exactly one move() call per typed move. An earlier version verified the
-		// call by diffing the FEN and retried when it had not changed - but
-		// chess.com applies a move asynchronously, so that check fired before the
-		// position updated and issued a second move() for the same input. Falling
-		// back is therefore only safe when the first call actually threw.
-		play(move) {
+		// Play the move, then confirm it actually landed before reporting success.
+		//
+		// Each form is checked after yielding to the event loop, never in the same
+		// block as the call: chess.com applies a move on the next tick, so a
+		// same-tick read always sees the old position. An earlier version got this
+		// wrong and fired a second move() for every single move.
+		//
+		// userGenerated marks this as a player's move rather than programmatic
+		// replay - captured from what the board itself passes when you click a
+		// piece. It is tried first because some modes ignore a move without it, and
+		// the plainer forms follow in case a mode rejects the flag.
+		async play(move) {
 			const g = game();
 			if (!g) return false;
-			const ok = safe(() => {
-				g.move({
-					from: move.from, to: move.to, promotion: move.promotion, userGenerated: true,
-				});
-				return true;
-			}, false);
-			if (ok) return true;
-			return safe(() => { g.move(move.san); return true; }, false);
-		},
-
-		// Asynchronous confirmation, for reporting only - never for retrying.
-		//
-		// Polls instead of sampling once: chess.com applies a move through an
-		// animation whose length depends on the user's board settings, so a single
-		// check on a timer reports good moves as failures. Success is "our move is
-		// now the last move", with a changed position as a second signal for when
-		// the opponent has already replied on top of it.
-		confirm(move, fenBefore, timeoutMs) {
-			const g = game();
-			if (!g) return Promise.resolve(true);
-			const deadline = Date.now() + (timeoutMs || 2500);
-			return new Promise(resolve => {
-				const poll = () => {
-					const last = safe(() => g.getLastMove(), null);
-					if (last && last.from === move.from && last.to === move.to) return resolve(true);
-					if (safe(() => g.getFEN(), fenBefore) !== fenBefore) return resolve(true);
-					if (Date.now() >= deadline) return resolve(false);
-					setTimeout(poll, 100);
-				};
-				setTimeout(poll, 100);
-			});
+			const base = { from: move.from, to: move.to, promotion: move.promotion };
+			const forms = [
+				{ ...base, userGenerated: true },
+				base,
+				move.san,
+			];
+			for (const form of forms) {
+				const before = safe(() => g.getFEN(), null);
+				safe(() => g.move(form));
+				await new Promise(r => setTimeout(r, 80));
+				const after = safe(() => g.getFEN(), null);
+				if (after !== null && after !== before) return true;
+			}
+			return false;
 		},
 
 		fen() {

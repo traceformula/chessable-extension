@@ -27,13 +27,26 @@
 		out.add(c);
 		if (c.includes('x')) out.add(c.replace(/x/g, ''));
 
-		// A disambiguated piece move is also accepted without its disambiguator:
-		// typing "nd2" with two knights available should offer both, not nothing.
-		// Pawn moves are excluded - dropping the file from "exd5" would collide
-		// with the unrelated pawn push "d5".
-		const dis = /^([nbrqk])[a-h1-8](x?)([a-h][1-8].*)$/.exec(c);
-		if (dis) out.add(dis[1] + dis[2] + dis[3]);
-		if (dis && dis[2]) out.add(dis[1] + dis[3]);
+		// Piece moves accept any disambiguator that identifies the origin square,
+		// not just the one SAN happens to use. With rooks on g8 and b6 both able to
+		// take on g6, SAN picks the file and writes "Rgxg6", but "the rook on the
+		// 8th rank" is just as unambiguous to a person - so "R8xg6" and the fully
+		// explicit "Rg8xg6" resolve too. Dropping the disambiguator entirely is
+		// allowed as well, which leaves the matcher to report the tie.
+		//
+		// Pawn moves are excluded throughout: stripping the file from "exd5" would
+		// collide with the unrelated pawn push "d5".
+		const piece = /^[nbrqk]/.test(c) ? c[0] : null;
+		if (piece && move.from && move.to) {
+			const cap = c.includes('x') ? 'x' : '';
+			const from = canon(move.from);
+			const to = canon(move.to);
+			const tail = c.slice(c.indexOf(to) + to.length); // promotion, if any
+			for (const hint of ['', from[0], from[1], from]) {
+				out.add(piece + hint + cap + to + tail);
+				if (cap) out.add(piece + hint + to + tail);
+			}
+		}
 
 		if (move.from && move.to) {
 			const uci = canon(move.from + move.to);

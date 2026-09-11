@@ -9,17 +9,32 @@
 	const adapter = ns.chesscom;
 	const { match, forms, canon } = ns.matcher;
 
-	ns.version = '1.2.4';
+	ns.version = '1.3.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 	const IDLE_HIDE_MS = 1400;
 
+	// A single character is never allowed to play a move, even when it already
+	// resolves uniquely. In sparse positions one letter can be unambiguous - with
+	// only one rook move available "r" alone is enough - and a move going out on
+	// the first keystroke is indistinguishable from a stray keypress.
+	const MIN_AUTO_KEYS = 2;
+
+	// Opt in with localStorage.setItem('kbm.commit', 'enter') to require Enter for
+	// every move instead of playing as soon as the input is unambiguous.
+	function requiresEnter() {
+		try { return localStorage.getItem('kbm.commit') === 'enter'; }
+		catch (e) { return false; }
+	}
+
 	let buffer = '';
-	// After an early commit the user is usually still typing the rest of the move
-	// they had in mind. Those leftover characters must not open a new buffer - on
-	// a position where "r" alone is unique, "Rxd2" would otherwise commit on "r"
-	// and then feed "x", "d", "2" into the next move. While `tail` is set we
-	// silently swallow anything that still spells the move just played.
+	// A resolved move held back for confirmation, either because Enter is required
+	// or because too few keys have been typed to auto-play.
+	let pending = null;
+	// After a commit the user is usually still typing the rest of the move they
+	// had in mind. Those leftover characters must not open a new buffer - on a
+	// position where "r" alone is unique, "Rxd2" would otherwise commit early and
+	// then feed "x", "d", "2" into the next move.
 	let tail = null;
 	let hideTimer = null;
 
@@ -32,6 +47,7 @@
 
 	function reset() {
 		buffer = '';
+		pending = null;
 		tail = null;
 		ns.hud.hide();
 	}
@@ -50,29 +66,26 @@
 	// to nothing, so "+" after "Rb1" and "=" after "e8" are absorbed too.
 	function continuesTail(key) {
 		if (!tail) return false;
-		const next = tail.consumed + canon(key);
-		return tail.forms.some(f => f.startsWith(next));
+		return tail.forms.some(f => f.startsWith(tail.consumed + canon(key)));
 	}
 
 	function commit(move, raw) {
-		const before = adapter.fen();
-		const played = adapter.play(move);
 		buffer = '';
-		tail = played ? { forms: forms(move), consumed: canon(raw) } : null;
-		ns.hud.show(move.san, { state: 'unique', candidates: [] }, played ? '' : 'rejected');
+		pending = null;
+		// Absorb the rest of the typed move straight away - the user is already
+		// mid-keystroke and should not have to wait on the board to catch up.
+		tail = { forms: forms(move), consumed: canon(raw) };
+		ns.hud.show(move.san, { state: 'unique', candidates: [] }, '');
 		scheduleHide();
 
-		// The call not throwing only means it was accepted, not that anything
-		// happened. Check afterwards and say so, rather than leaving a move that
-		// silently went nowhere looking successful.
-		if (played && before) {
-			adapter.confirm(move, before).then(moved => {
-				if (!moved) {
-					ns.hud.show(move.san, { state: 'none', candidates: [] }, 'not accepted');
-					scheduleHide();
-				}
-			});
-		}
+		// play() resolves only once the position has actually changed, so a move
+		// that went nowhere is reported rather than left looking successful.
+		Promise.resolve(adapter.play(move)).then(played => {
+			if (played) return;
+			tail = null;
+			ns.hud.show(move.san, { state: 'none', candidates: [] }, 'not accepted');
+			scheduleHide();
+		});
 	}
 
 	function onKey(e) {
@@ -85,10 +98,18 @@
 			return;
 		}
 
+		if (e.key === 'Enter') {
+			if (!pending) return;
+			e.preventDefault();
+			commit(pending, buffer);
+			return;
+		}
+
 		if (e.key === 'Backspace') {
 			if (!buffer) return;
 			e.preventDefault();
 			buffer = buffer.slice(0, -1);
+			pending = null;
 			if (!buffer) return reset();
 			render(match(buffer, adapter.legalMoves()));
 			return;
@@ -139,13 +160,19 @@
 		}
 
 		e.preventDefault();
+		buffer = next;
 
 		if (result.state === 'unique') {
+			if (requiresEnter() || canon(next).length < MIN_AUTO_KEYS) {
+				pending = result.move;
+				render(result, result.move.san + ' - enter to play');
+				return;
+			}
 			commit(result.move, next);
 			return;
 		}
 
-		buffer = next;
+		pending = null;
 		render(result);
 	}
 

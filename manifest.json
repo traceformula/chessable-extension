@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chess Utility Extension",
   "description": "Keyboard move input for chess.com, plus Chessable helpers",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "action": {
     "default_popup": "main.html",
     "default_icon": "hi.png"

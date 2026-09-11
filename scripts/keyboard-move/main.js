@@ -9,7 +9,7 @@
 	const adapter = ns.chesscom;
 	const { match, forms, canon } = ns.matcher;
 
-	ns.version = '1.4.2';
+	ns.version = '1.4.3';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -108,6 +108,11 @@
 	}
 
 	function onKey(e) {
+		// Registered on both window and document, so whichever survives handles the
+		// key and the other sees it already dealt with.
+		if (e.__kbmSeen) return;
+		e.__kbmSeen = true;
+
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
 		if (editable(e.target)) return;
 		if (!adapter.isReady()) return;
@@ -243,6 +248,12 @@
 	// prototype by now. Page scripts and other extensions do replace that method,
 	// and a wrapper that drops or reorders listeners would silently cost us every
 	// keystroke. Running at document_start means we capture it before most of them.
+	//
+	// Bound at window as well as document: window capture is the earliest point in
+	// the path, which matters for keys the site also wants. chess.com closes its
+	// dialogs on Escape, and a handler above us that stops propagation would take
+	// the key before a document-only listener ever saw it.
 	const nativeAdd = EventTarget.prototype.addEventListener;
+	nativeAdd.call(window, 'keydown', onKey, true);
 	nativeAdd.call(document, 'keydown', onKey, true);
 })();

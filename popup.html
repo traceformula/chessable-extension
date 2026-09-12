@@ -35,6 +35,22 @@
 	.saved { opacity: 0; transition: opacity .15s; font-size: 11px; color: #2e9e4f; }
 	.saved.on { opacity: 1; }
 	footer { margin-top: 14px; opacity: .5; font-size: 11px; }
+	p.hint { margin: 0 0 8px; opacity: .6; font-size: 11.5px; }
+	button.add {
+		font: inherit; width: 100%; padding: 6px 10px; cursor: pointer;
+		border-radius: 6px; border: 1px solid rgba(127,127,127,.4);
+		background: rgba(127,127,127,.12); color: inherit;
+	}
+	button.add:hover { background: rgba(127,127,127,.22); }
+	ul { list-style: none; margin: 8px 0 0; padding: 0; }
+	ul li {
+		display: flex; align-items: center; justify-content: space-between;
+		gap: 8px; padding: 3px 0; font-size: 12px;
+	}
+	ul li button {
+		font: inherit; cursor: pointer; border: 0; background: none;
+		color: #c0504a; padding: 0 2px;
+	}
 </style>
 
 <h1>Chess Utility</h1>
@@ -87,5 +103,10 @@
 	</select>
 </label>
 
-<footer>Settings sync with your Chrome profile. Reload an open chess.com tab to apply.</footer>
+<h2>Sites</h2>
+<p class="hint" id="siteState">Keyboard navigation runs on the chess sites automatically.</p>
+<button id="addSite" class="add" hidden></button>
+<ul id="siteList"></ul>
+
+<footer>Settings sync with your Chrome profile. Reload an open tab to apply.</footer>
 <script src="popup.js"></script>

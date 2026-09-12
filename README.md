@@ -170,6 +170,20 @@ the document itself does not scroll the largest scrolling panel on screen is
 used — board pages are often a fixed shell around one scrolling column, where
 scrolling the document does nothing at all.
 
+### Adding other sites
+
+Link hints and scrolling can run anywhere, not just the chess sites. Open a
+site, click the extension icon, and press **Enable on …**. Chrome asks you to
+confirm that one origin; nothing else changes.
+
+This is why the extension requests no broad access at install. Sites are host
+permissions you grant yourself, one at a time, and any of them can be taken
+back from `chrome://extensions` without affecting the others. Removing one from
+the popup revokes the permission outright rather than merely disabling it.
+
+Only page navigation extends this way. The board adapters read one site's
+internals each and have nothing to offer an arbitrary page.
+
 ### Settings
 
 Click the extension's toolbar icon. Two settings, both stored in

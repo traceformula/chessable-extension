@@ -9,6 +9,9 @@
 // page with no board on it.
 (function () {
 	const ns = (globalThis.__KBM = globalThis.__KBM || {});
+	// Registered at runtime for a site that is also in the manifest would load
+	// this twice, and every key would be handled twice.
+	if (ns.scroll) return;
 
 	const STEP = 64;          // one press; key repeat makes it continuous
 	const MIN_SCROLLABLE = 24;

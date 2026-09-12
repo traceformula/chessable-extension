@@ -10,6 +10,9 @@
 // on it at all - which is exactly Chessable's outer page.
 (function () {
 	const ns = (globalThis.__KBM = globalThis.__KBM || {});
+	// Registered at runtime for a site that is also in the manifest would load
+	// this twice, and every key would be handled twice.
+	if (ns.hints) return;
 
 	// Home row first: the characters are typed blind, right after looking at a
 	// label rather than at the keyboard.

@@ -2,8 +2,15 @@
 // the part where a mistake is silent: a label that prefixes another can never be
 // typed, because the shorter one fires first.
 const assert = require('assert');
+// hints.js registers its key listeners as soon as it loads, so the stubs have to
+// be real EventTargets - node's addEventListener refuses a plain object.
 globalThis.__KBM = {};
-globalThis.document = { getElementById: () => null, querySelectorAll: () => [] };
+globalThis.window = new EventTarget();
+globalThis.document = Object.assign(new EventTarget(), {
+	getElementById: () => null,
+	querySelectorAll: () => [],
+	documentElement: null,
+});
 require('../scripts/keyboard-move/hints.js');
 const labelsFor = globalThis.__KBM.hintLabels;
 

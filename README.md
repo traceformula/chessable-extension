@@ -133,9 +133,11 @@ break `f4` and `Nf3` outright.
 
 This exists so that Vimium can be switched off on these sites without losing
 anything. It only runs where the extension already runs, so it needs no
-permission beyond what the boards already required, and it hints one frame at
-a time — on Chessable that is the outer page or the board frame, whichever has
-focus.
+permission beyond what the boards already required.
+
+Same-origin frames are hinted together with the page holding them, so on
+Chessable one press covers both the site navigation and the board's own
+controls. Cross-origin frames cannot be reached and are skipped.
 
 ### Settings
 

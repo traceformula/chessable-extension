@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chess Utility Extension",
   "description": "Keyboard move input for chess.com, plus Chessable helpers",
-  "version": "1.14.0",
+  "version": "1.14.1",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -65,6 +65,7 @@
     },
     {
       "js": [
+        "scripts/keyboard-move/hints.js",
         "scripts/keyboard-move/chessable-relay.js"
       ],
       "matches": [

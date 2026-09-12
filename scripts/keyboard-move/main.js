@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.14.0';
+	ns.version = '1.14.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -252,25 +252,8 @@
 
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-		// Hints own the keyboard while they are up, whatever the site is.
-		if (ns.hints && ns.hints.isActive()) {
-			if (ns.hints.handleKey(e)) return;
-		}
-
 		const site = adapter();
 		if (!site) return;
-
-		// ";" rather than Vimium's "f": on a chess board f is a file letter, so
-		// taking it would break "f4" and "Nf3" outright.
-		if (e.key === ';' && !buffer && !editable(e.target) && ns.hints) {
-			e.preventDefault();
-			const shown = ns.hints.open();
-			if (!shown) {
-				ns.hud.show('', { state: 'none', candidates: [] }, 'nothing to click here');
-				scheduleHide('message');
-			}
-			return;
-		}
 
 		// Escape returns from the chat line to the board. Every other key typed in
 		// a text field is the site's, so chat still works normally.

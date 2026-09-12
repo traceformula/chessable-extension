@@ -17,7 +17,7 @@
 	const MAX_HINTS = 250;
 	const MAX_FRAME_DEPTH = 4;
 	const MAX_SCANNED = 6000;
-	const CLICKABLE = [
+	const MARKUP = [
 		'a[href]', 'button', 'select', 'textarea', 'summary', 'label[for]',
 		'input:not([type="hidden"])',
 		'[role="button"]', '[role="link"]', '[role="tab"]', '[role="checkbox"]',
@@ -25,7 +25,6 @@
 		'[tabindex]:not([tabindex="-1"])',
 		// Tagged by clickable-probe.js: the element registered a click handler in
 		// code, which is the only trace an application built from bare divs leaves.
-		'[data-kbm-click]',
 	].join(',');
 
 	const CSS = `
@@ -83,6 +82,20 @@
 
 	ns.hintLabels = labelsFor;   // exported for tests
 
+	// Candidates carry a strength, because the three ways of spotting one are not
+	// equally trustworthy:
+	//
+	//   markup (3)  a link, a button, an ARIA role - says what it is
+	//   probe  (2)  a click handler was attached - true of rows AND of the panels
+	//               holding them, since a framework marks its containers too
+	//   cursor (1)  a pointer cursor - inherited, so every span inside a link has one
+	//
+	// Two rules follow. A candidate holding another of equal or greater strength
+	// is a wrapper, not a target, so the panel yields to the row and the row to a
+	// button inside it. A candidate sitting inside a stronger one is decoration,
+	// so a link's icon and text yield to the link.
+	const STRENGTH = { markup: 3, probe: 2, cursor: 1 };
+
 	function hidden(style) {
 		return style.visibility === 'hidden' || style.display === 'none' ||
 			Number(style.opacity) === 0;
@@ -101,7 +114,7 @@
 	// into the coordinates of the frame the labels are drawn in. Chessable keeps
 	// its board in an iframe, so without this a page could hint its own links or
 	// the board's, never both.
-	function collect(doc, dx, dy, out, depth) {
+	function collect(doc, dx, dy, out, depth, blocked) {
 		const view = doc.defaultView;
 		if (!view) return;
 		let scanned = 0;
@@ -121,13 +134,15 @@
 			// role the page has declared; the pointer cursor catches everything
 			// else, which on an application built out of plain divs - the xiangqi
 			// client is compiled from Java - is the only signal there is.
-			const declared = el.matches(CLICKABLE);
-			if (!declared && style.cursor !== 'pointer') continue;
-			// A handler on something the size of the page is delegation, not a
-			// target: hinting it would put one label over the whole screen.
+			const strength = el.matches(MARKUP) ? STRENGTH.markup
+				: el.hasAttribute('data-kbm-click') ? STRENGTH.probe
+				: style.cursor === 'pointer' ? STRENGTH.cursor
+				: 0;
+			if (!strength) continue;
+			// Something the size of the page is delegation, not a target.
 			if (rect.width > view.innerWidth * 0.9 && rect.height > view.innerHeight * 0.6) continue;
-			if (!onTop(doc, el, rect, view)) continue;
-			out.push({ el, declared, left: rect.left + dx, top: rect.top + dy });
+			if (!onTop(doc, el, rect, view)) { blocked.push({ el, strength, left: rect.left + dx, top: rect.top + dy }); continue; }
+			out.push({ el, strength, left: rect.left + dx, top: rect.top + dy });
 		}
 		if (depth >= MAX_FRAME_DEPTH) return;
 		for (const frame of doc.querySelectorAll('iframe, frame')) {
@@ -136,38 +151,22 @@
 			if (!sub || !sub.body) continue;
 			const fr = frame.getBoundingClientRect();
 			if (fr.width < 8 || fr.height < 8) continue;
-			collect(sub, dx + fr.left, dy + fr.top, out, depth + 1);
+			collect(sub, dx + fr.left, dy + fr.top, out, depth + 1, blocked);
 		}
 	}
 
-	// A pointer cursor is inherited, so a clickable link makes every span, icon and
-	// SVG path inside it look clickable too. Declared markup is therefore trusted
-	// over the cursor, and the two are pruned by different rules.
-	//
-	// Declared elements are kept unless nested in another declared one. A
-	// cursor-only element is kept only when nothing above it is already a hint and
-	// nothing below it is declared - so the row of a table built from bare divs
-	// gets a hint, while the box drawn around a real link does not.
 	function prune(found) {
-		const all = new Set(found.map(f => f.el));
-		const declared = new Set(found.filter(f => f.declared).map(f => f.el));
-
-		// Every ancestor of a declared element: these are wrappers, not targets.
-		const wrappers = new Set();
-		for (const el of declared) {
-			for (let p = el.parentElement; p; p = p.parentElement) wrappers.add(p);
-		}
-
-		const hasAncestorIn = (el, set) => {
-			for (let p = el.parentElement; p; p = p.parentElement) {
-				if (set.has(p)) return true;
+		const byEl = new Map(found.map(f => [f.el, f]));
+		const drop = new Set();
+		for (const f of found) {
+			for (let p = f.el.parentElement; p; p = p.parentElement) {
+				const ancestor = byEl.get(p);
+				if (!ancestor) continue;
+				if (ancestor.strength <= f.strength) drop.add(ancestor.el);
+				else drop.add(f.el);
 			}
-			return false;
-		};
-
-		return found.filter(f => f.declared
-			? !hasAncestorIn(f.el, declared)
-			: !hasAncestorIn(f.el, all) && !wrappers.has(f.el));
+		}
+		return found.filter(f => !drop.has(f.el));
 	}
 
 	function render() {
@@ -234,9 +233,14 @@
 				document.dispatchEvent(new CustomEvent('kbm-tag-clickables'));
 			} catch (e) { /* no probe on this page: markup and cursor still apply */ }
 
-			const raw = [];
-			collect(document, 0, 0, raw, 0);
-			const found = prune(raw);
+			const raw = [], blocked = [];
+			collect(document, 0, 0, raw, 0, blocked);
+			let found = prune(raw);
+			// An application may float a transparent layer over the whole page, in
+			// which case the hit test rejects everything beneath it. Rather than
+			// report an empty page, fall back to what was rejected for that reason
+			// alone - a hint that might be covered beats no hints at all.
+			if (!found.length && blocked.length) found = prune(blocked);
 			if (!found.length) { notice('nothing to click here'); return 0; }
 
 			styles();

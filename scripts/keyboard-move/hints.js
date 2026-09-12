@@ -238,6 +238,10 @@
 
 			const raw = [], blocked = [];
 			collect(document, 0, 0, raw, 0, blocked);
+			// Tags exist only for this collection: leaving extension attributes on
+			// a running application's elements is not something to do casually.
+			try { document.dispatchEvent(new CustomEvent('kbm-untag-clickables')); }
+			catch (e) { /* no probe here */ }
 			let found = prune(raw);
 			// An application may float a transparent layer over the whole page, in
 			// which case the hit test rejects everything beneath it. Rather than

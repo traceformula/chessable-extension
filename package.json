@@ -1,6 +1,6 @@
 {
   "name": "chess-utility-extension",
-  "version": "1.20.1",
+  "version": "1.20.2",
   "private": true,
   "description": "Chrome extension: keyboard move input for chess.com, plus Chessable helpers",
   "scripts": {

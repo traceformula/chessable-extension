@@ -126,7 +126,16 @@ Chessable explore boards have no opponent and no premoves.
 ### Clicking without the mouse
 
 `;` labels everything clickable on screen; type a label to click it. `Esc`
-cancels, `Backspace` corrects. Text fields are focused rather than clicked.
+cancels, `Backspace` corrects. Text fields are focused rather than clicked. If
+nothing on the page can be clicked, it says so rather than doing nothing.
+
+Clickability is judged two ways. Declared markup — a link, a button, an ARIA
+role — is trusted first. Everything else is found by its pointer cursor, which
+is the only signal an application built from bare divs gives: the xiangqi
+client is compiled from Java and its table rows carry no role, href or
+tabindex at all. Since a pointer cursor is inherited, a declared element always
+wins over the box drawn around it, so a link never fragments into separate
+hints for its icon and its text.
 
 It is `;` and not Vimium's `f` because `f` is a file letter — binding it would
 break `f4` and `Nf3` outright.

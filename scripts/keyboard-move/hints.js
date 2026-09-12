@@ -16,6 +16,7 @@
 	const ALPHABET = 'sadfjklewcmpgh';
 	const MAX_HINTS = 250;
 	const MAX_FRAME_DEPTH = 4;
+	const MAX_SCANNED = 6000;
 	const CLICKABLE = [
 		'a[href]', 'button', 'select', 'textarea', 'summary', 'label[for]',
 		'input:not([type="hidden"])',
@@ -37,6 +38,14 @@
 	white-space: nowrap;
 }
 .kbm-hint .kbm-hint-done { opacity: .35; }
+.kbm-hint-notice {
+	position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+	z-index: 2147483600; pointer-events: none;
+	padding: 8px 14px; border-radius: 8px;
+	background: rgba(150,40,40,.95); color: #fff;
+	font: 500 13px/1.2 system-ui, -apple-system, sans-serif;
+	box-shadow: 0 4px 16px rgba(0,0,0,.4);
+}
 `;
 
 	let layer = null;
@@ -71,17 +80,14 @@
 
 	ns.hintLabels = labelsFor;   // exported for tests
 
-	function visible(doc, el, rect) {
-		const view = doc.defaultView;
-		if (!view) return false;
-		if (rect.width < 4 || rect.height < 4) return false;
-		if (rect.bottom < 0 || rect.right < 0) return false;
-		if (rect.top > view.innerHeight || rect.left > view.innerWidth) return false;
-		const style = view.getComputedStyle(el);
-		if (style.visibility === 'hidden' || style.display === 'none') return false;
-		if (Number(style.opacity) === 0) return false;
-		// Something painted over it - a modal, a sticky header - means a click
-		// would not reach it anyway, so it should not be offered.
+	function hidden(style) {
+		return style.visibility === 'hidden' || style.display === 'none' ||
+			Number(style.opacity) === 0;
+	}
+
+	// Something painted over it - a modal, a sticky header - means a click would
+	// not reach it anyway, so it should not be offered.
+	function onTop(doc, el, rect, view) {
 		const x = Math.min(Math.max(rect.left + rect.width / 2, 1), view.innerWidth - 1);
 		const y = Math.min(Math.max(rect.top + rect.height / 2, 1), view.innerHeight - 1);
 		const top = doc.elementFromPoint(x, y);
@@ -93,13 +99,29 @@
 	// its board in an iframe, so without this a page could hint its own links or
 	// the board's, never both.
 	function collect(doc, dx, dy, out, depth) {
-		for (const el of doc.querySelectorAll(CLICKABLE)) {
+		const view = doc.defaultView;
+		if (!view) return;
+		let scanned = 0;
+		for (const el of doc.querySelectorAll('*')) {
 			if (out.length >= MAX_HINTS) return;
-			if (el.closest('.kbm-hint-layer')) continue;
+			if (++scanned > MAX_SCANNED) break;
 			if (el.disabled) continue;
-			const r = el.getBoundingClientRect();
-			if (!visible(doc, el, r)) continue;
-			out.push({ el, left: r.left + dx, top: r.top + dy });
+			const rect = el.getBoundingClientRect();
+			if (rect.width < 4 || rect.height < 4) continue;
+			if (rect.bottom < 0 || rect.right < 0) continue;
+			if (rect.top > view.innerHeight || rect.left > view.innerWidth) continue;
+
+			const style = view.getComputedStyle(el);
+			if (hidden(style)) continue;
+
+			// Two ways of being clickable. The markup list catches anything with a
+			// role the page has declared; the pointer cursor catches everything
+			// else, which on an application built out of plain divs - the xiangqi
+			// client is compiled from Java - is the only signal there is.
+			const declared = el.matches(CLICKABLE);
+			if (!declared && style.cursor !== 'pointer') continue;
+			if (!onTop(doc, el, rect, view)) continue;
+			out.push({ el, declared, left: rect.left + dx, top: rect.top + dy });
 		}
 		if (depth >= MAX_FRAME_DEPTH) return;
 		for (const frame of doc.querySelectorAll('iframe, frame')) {
@@ -110,6 +132,36 @@
 			if (fr.width < 8 || fr.height < 8) continue;
 			collect(sub, dx + fr.left, dy + fr.top, out, depth + 1);
 		}
+	}
+
+	// A pointer cursor is inherited, so a clickable link makes every span, icon and
+	// SVG path inside it look clickable too. Declared markup is therefore trusted
+	// over the cursor, and the two are pruned by different rules.
+	//
+	// Declared elements are kept unless nested in another declared one. A
+	// cursor-only element is kept only when nothing above it is already a hint and
+	// nothing below it is declared - so the row of a table built from bare divs
+	// gets a hint, while the box drawn around a real link does not.
+	function prune(found) {
+		const all = new Set(found.map(f => f.el));
+		const declared = new Set(found.filter(f => f.declared).map(f => f.el));
+
+		// Every ancestor of a declared element: these are wrappers, not targets.
+		const wrappers = new Set();
+		for (const el of declared) {
+			for (let p = el.parentElement; p; p = p.parentElement) wrappers.add(p);
+		}
+
+		const hasAncestorIn = (el, set) => {
+			for (let p = el.parentElement; p; p = p.parentElement) {
+				if (set.has(p)) return true;
+			}
+			return false;
+		};
+
+		return found.filter(f => f.declared
+			? !hasAncestorIn(f.el, declared)
+			: !hasAncestorIn(f.el, all) && !wrappers.has(f.el));
 	}
 
 	function render() {
@@ -152,14 +204,27 @@
 
 	function onScroll() { ns.hints.close(); }
 
+	// Hints run in the extension's world, where the board overlay is not
+	// available, so they carry a minimal notice of their own. Failing silently is
+	// what made an empty result indistinguishable from a dead key.
+	function notice(text) {
+		styles();
+		const el = document.createElement('div');
+		el.className = 'kbm-hint-notice';
+		el.textContent = text;
+		(document.body || document.documentElement).appendChild(el);
+		setTimeout(() => el.remove(), 1800);
+	}
+
 	ns.hints = {
 		isActive() { return !!layer; },
 
 		open() {
 			this.close();
-			const found = [];
-			collect(document, 0, 0, found, 0);
-			if (!found.length) return 0;
+			const raw = [];
+			collect(document, 0, 0, raw, 0);
+			const found = prune(raw);
+			if (!found.length) { notice('nothing to click here'); return 0; }
 
 			styles();
 			layer = document.createElement('div');

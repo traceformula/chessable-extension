@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.13.1';
+	ns.version = '1.14.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -251,8 +251,26 @@
 		e.__kbmSeen = true;
 
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+		// Hints own the keyboard while they are up, whatever the site is.
+		if (ns.hints && ns.hints.isActive()) {
+			if (ns.hints.handleKey(e)) return;
+		}
+
 		const site = adapter();
 		if (!site) return;
+
+		// ";" rather than Vimium's "f": on a chess board f is a file letter, so
+		// taking it would break "f4" and "Nf3" outright.
+		if (e.key === ';' && !buffer && !editable(e.target) && ns.hints) {
+			e.preventDefault();
+			const shown = ns.hints.open();
+			if (!shown) {
+				ns.hud.show('', { state: 'none', candidates: [] }, 'nothing to click here');
+				scheduleHide('message');
+			}
+			return;
+		}
 
 		// Escape returns from the chat line to the board. Every other key typed in
 		// a text field is the site's, so chat still works normally.
@@ -350,6 +368,9 @@
 						[['\u2190', '\u2192'], 'step back and forward one move'],
 						[['\u2191', '\u2193'], 'jump to the first or last move'],
 					] },
+					{ group: 'Page', rows: [
+						[';', 'label everything clickable, then type a label'],
+					] },
 					{ group: 'Lobby', rows: [
 						['f', 'findtable'], ['r', 'rooms'], ['n', 'new tables'],
 						['t', 'tables'], ['j', 'join'], ['o', 'options'],
@@ -416,6 +437,9 @@
 					[['\u2190', '\u2192'], 'step back and forward one move'],
 					[['\u2191', '\u2193'], 'jump to the start or end of the line'],
 					['u', 'take back a move'],
+				] },
+				{ group: 'Page', rows: [
+					[';', 'label everything clickable, then type a label'],
 				] },
 				{ group: 'Premoves', rows: [[
 					premoves ? (settings.premove ? 'on' : 'off') : 'n/a',

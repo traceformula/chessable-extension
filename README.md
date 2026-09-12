@@ -123,6 +123,20 @@ are simply unavailable if it does not match.
 chess.com executes the queued move itself, so there is no added delay.
 Chessable explore boards have no opponent and no premoves.
 
+### Clicking without the mouse
+
+`;` labels everything clickable on screen; type a label to click it. `Esc`
+cancels, `Backspace` corrects. Text fields are focused rather than clicked.
+
+It is `;` and not Vimium's `f` because `f` is a file letter — binding it would
+break `f4` and `Nf3` outright.
+
+This exists so that Vimium can be switched off on these sites without losing
+anything. It only runs where the extension already runs, so it needs no
+permission beyond what the boards already required, and it hints one frame at
+a time — on Chessable that is the outer page or the board frame, whichever has
+focus.
+
 ### Settings
 
 Click the extension's toolbar icon. Two settings, both stored in

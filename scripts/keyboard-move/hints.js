@@ -210,6 +210,62 @@
 		}
 	}
 
+	// Clicking whatever the browser's find has landed on.
+	//
+	// Chrome's find-in-page highlight is drawn by the browser and is not in the
+	// DOM, but the active match is left as the document selection - which is
+	// readable. So Cmd+F, type, Escape, and then this clicks the link the text
+	// belongs to without ever reaching for the mouse.
+	//
+	// The selection is a run of text, so the click target is the nearest ancestor
+	// that is actually clickable; failing that, the element the text sits in.
+	// Ordered by strength, not by distance. A pointer cursor is inherited, so the
+	// span holding the matched words looks as clickable as the link around it -
+	// taking the nearest match returns the span, and a handler that checks its
+	// target would then miss. Declared markup is looked for first, all the way up,
+	// before falling back to weaker signals.
+	function clickableAncestor(node) {
+		const chain = [];
+		for (let el = node; el && el.nodeType === 1; el = el.parentElement) chain.push(el);
+
+		for (const el of chain) {
+			if (el.matches(MARKUP)) return el;
+		}
+		for (const el of chain) {
+			if (el.hasAttribute('data-kbm-click')) return el;
+		}
+		for (const el of chain) {
+			const view = el.ownerDocument.defaultView;
+			if (view && view.getComputedStyle(el).cursor === 'pointer') return el;
+		}
+		return null;
+	}
+
+	function clickSelection() {
+		const selection = window.getSelection();
+		if (!selection || !selection.rangeCount || selection.isCollapsed) return 'none';
+
+		const range = selection.getRangeAt(0);
+		let node = range.commonAncestorContainer;
+		if (node && node.nodeType !== 1) node = node.parentElement;
+		if (!node) return 'none';
+
+		// Ask the probe first: on a page whose handlers leave no trace in markup,
+		// the clickable ancestor is only visible while the tags exist.
+		try { document.dispatchEvent(new CustomEvent('kbm-tag-clickables')); }
+		catch (e) { /* no probe here */ }
+		const target = clickableAncestor(node);
+		try { document.dispatchEvent(new CustomEvent('kbm-untag-clickables')); }
+		catch (e) { /* nothing to undo */ }
+
+		if (!target) return 'nothing';
+		selection.removeAllRanges();
+		activate(target);
+		return 'ok';
+	}
+
+	ns.clickSelection = clickSelection;
+
 	function onScroll() { ns.hints.close(); }
 
 	// Hints run in the extension's world, where the board overlay is not
@@ -329,9 +385,21 @@
 			if (ns.hints.handleKey(e)) e.stopImmediatePropagation();
 			return;
 		}
+		if (editable(e.target)) return;
+
+		// "'" clicks whatever the browser's find has selected.
+		if (e.key === "'") {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			const result = clickSelection();
+			if (result === 'none') notice('no text selected - use find first');
+			else if (result === 'nothing') notice('that text is not clickable');
+			return;
+		}
+
 		// ";" rather than Vimium's "f": on a chess board f is a file letter, so
 		// taking it would break "f4" and "Nf3" outright.
-		if (e.key !== ';' || editable(e.target)) return;
+		if (e.key !== ';') return;
 		e.preventDefault();
 		e.stopImmediatePropagation();
 		ns.hints.open();

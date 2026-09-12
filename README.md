@@ -154,6 +154,23 @@ Same-origin frames are hinted together with the page holding them, so on
 Chessable one press covers both the site navigation and the board's own
 controls. Cross-origin frames cannot be reached and are skipped.
 
+### Clicking what you searched for
+
+Chrome's find-in-page highlight is drawn by the browser and is not in the page,
+but the match it lands on is left as the document selection — which is
+readable. So:
+
+**`Cmd+F`** → type → **`Esc`** → **`'`**
+
+and the link that text belongs to is clicked. The `Esc` matters: while the find
+bar is open the match is Chrome's own highlight, and it only becomes a
+selection once the bar closes.
+
+The selection is a run of text rather than an element, so the click goes to the
+nearest ancestor that is actually clickable — a declared link or button first,
+and only then something weaker like a pointer cursor, since that is inherited by
+every span inside a link.
+
 ### Scrolling
 
 | Key | Does |

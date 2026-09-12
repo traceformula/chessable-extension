@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.20.2';
+	ns.version = '1.21.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -434,6 +434,7 @@
 				] },
 				{ group: 'Page', rows: [
 					[';', 'label everything clickable, then type a label'],
+					["'", 'click what find selected \u2014 cmd+f, type, esc, then \u2019'],
 					[['w', 's'], 'scroll up and down'],
 					[['W', 'S'], 'jump to the top or bottom'],
 				] },

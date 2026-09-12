@@ -13,6 +13,8 @@ zip -q -r "$out" \
   manifest.json \
   popup.html \
   popup.js \
+  options.html \
+  options.js \
   icons \
   scripts \
   -x '*.DS_Store'

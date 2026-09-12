@@ -172,9 +172,14 @@ scrolling the document does nothing at all.
 
 ### Adding other sites
 
-Link hints and scrolling can run anywhere, not just the chess sites. Open a
-site, click the extension icon, and press **Enable on …**. Chrome asks you to
-confirm that one origin; nothing else changes.
+Link hints and scrolling can run anywhere, not just the chess sites. Open the
+extension's options page — the **Manage sites…** button in the popup — type a
+domain, and Chrome asks you to confirm that one origin. Nothing else changes.
+
+Adding a site from the options page rather than the popup is deliberate:
+Chrome's permission prompt can close a popup, and that cancels the request the
+popup was opened to make. It fails silently, so the site looks enabled while
+nothing was granted.
 
 This is why the extension requests no broad access at install. Sites are host
 permissions you grant yourself, one at a time, and any of them can be taken

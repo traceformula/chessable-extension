@@ -191,6 +191,12 @@ nearest ancestor that is actually clickable — a declared link or button first,
 and only then something weaker like a pointer cursor, since that is inherited by
 every span inside a link.
 
+**This works on prose, not on controls.** Text inside an element with
+`user-select: none` can be found and highlighted by the browser but cannot
+become a selection, and that property is set on most buttons, menu items and
+navigation. On those, `'` reports that there is no selection — use `;` instead,
+which does not depend on the text being selectable.
+
 ### Scrolling
 
 | Key | Does |

@@ -217,6 +217,12 @@
 	// readable. So Cmd+F, type, Escape, and then this clicks the link the text
 	// belongs to without ever reaching for the mouse.
 	//
+	// This has a hard limit, and it falls exactly where it hurts. Text inside an
+	// element with user-select: none can be found and highlighted by the browser
+	// but cannot become a selection, so nothing is readable afterwards - and that
+	// property is set on almost every button, menu item and piece of navigation
+	// chrome there is. Prose works; controls do not. Hints reach those instead.
+	//
 	// The selection is a run of text, so the click target is the nearest ancestor
 	// that is actually clickable; failing that, the element the text sits in.
 	// Ordered by strength, not by distance. A pointer cursor is inherited, so the
@@ -392,7 +398,9 @@
 			e.preventDefault();
 			e.stopImmediatePropagation();
 			const result = clickSelection();
-			if (result === 'none') notice('no text selected - use find first');
+			if (result === 'none') {
+				notice('no selection \u2014 buttons and menus cannot be selected; use ; instead');
+			}
 			else if (result === 'nothing') notice('that text is not clickable');
 			return;
 		}

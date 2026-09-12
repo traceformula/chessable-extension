@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chess Utility Extension",
   "description": "Keyboard move input for chess.com, plus Chessable helpers",
-  "version": "1.18.1",
+  "version": "1.18.2",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -28,10 +28,13 @@
       ],
       "matches": [
         "https://www.chess.com/*",
+        "https://chess.com/*",
         "https://www.chessable.com/*",
         "https://chessable.com/*",
         "https://lichess.org/*",
-        "https://www.clubxiangqi.com/*"
+        "https://www.lichess.org/*",
+        "https://www.clubxiangqi.com/*",
+        "https://clubxiangqi.com/*"
       ],
       "world": "MAIN",
       "all_frames": true,
@@ -56,7 +59,8 @@
         "scripts/keyboard-move/main.js"
       ],
       "matches": [
-        "https://www.chess.com/*"
+        "https://www.chess.com/*",
+        "https://chess.com/*"
       ],
       "world": "MAIN",
       "run_at": "document_start"
@@ -70,7 +74,8 @@
         "scripts/keyboard-move/main.js"
       ],
       "matches": [
-        "https://www.chessable.com/mt1/*"
+        "https://www.chessable.com/mt1/*",
+        "https://chessable.com/mt1/*"
       ],
       "world": "MAIN",
       "all_frames": true,
@@ -95,7 +100,8 @@
         "scripts/keyboard-move/main.js"
       ],
       "matches": [
-        "https://www.clubxiangqi.com/webapp/*"
+        "https://www.clubxiangqi.com/webapp/*",
+        "https://clubxiangqi.com/webapp/*"
       ],
       "run_at": "document_start"
     },
@@ -108,7 +114,8 @@
         "scripts/keyboard-move/main.js"
       ],
       "matches": [
-        "https://lichess.org/*"
+        "https://lichess.org/*",
+        "https://www.lichess.org/*"
       ],
       "world": "MAIN",
       "run_at": "document_start"
@@ -119,7 +126,9 @@
       ],
       "matches": [
         "https://www.chess.com/*",
-        "https://www.chessable.com/mt1/*"
+        "https://chess.com/*",
+        "https://www.chessable.com/mt1/*",
+        "https://chessable.com/mt1/*"
       ],
       "all_frames": true,
       "run_at": "document_start"
@@ -131,10 +140,13 @@
       ],
       "matches": [
         "https://www.chess.com/*",
+        "https://chess.com/*",
         "https://www.chessable.com/*",
         "https://chessable.com/*",
         "https://lichess.org/*",
-        "https://www.clubxiangqi.com/*"
+        "https://www.lichess.org/*",
+        "https://www.clubxiangqi.com/*",
+        "https://clubxiangqi.com/*"
       ],
       "all_frames": true,
       "run_at": "document_start"

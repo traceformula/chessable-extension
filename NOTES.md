@@ -79,6 +79,14 @@ Note lichess's native input will fight ours if left enabled: `Enter` steals
 focus into their box. Detect `.keyboard-move` and either stand down or tell the
 user to turn their preference off.
 
+## Match patterns
+
+Chrome match patterns are host-exact: `https://www.site.com/*` does not match
+`https://site.com/`. Every host is therefore listed in both forms. This cost a
+round of "hints are broken" reports that were really "nothing was injected
+here at all" — the symptom is indistinguishable, so check `__KBM` in the
+console before debugging any behaviour.
+
 ## Smaller items
 
 - **Promotion on Chessable.** `onDrop`'s signature has nowhere to pass the

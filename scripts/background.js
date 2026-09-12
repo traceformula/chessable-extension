@@ -81,10 +81,33 @@ function safeSync() {
 // The popup asks for this so a failure can be shown next to the site rather
 // than left in a service worker log nobody opens.
 chrome.runtime.onMessage.addListener((msg, sender, reply) => {
-	if (!msg || msg.type !== 'kbm-sync') return false;
-	sync().then(status => reply({ ok: true, status }))
-		.catch(e => reply({ ok: false, error: String(e && e.message || e) }));
-	return true;   // reply is async
+	if (!msg) return false;
+
+	if (msg.type === 'kbm-sync') {
+		sync().then(status => reply({ ok: true, status }))
+			.catch(e => reply({ ok: false, error: String(e && e.message || e) }));
+		return true;   // reply is async
+	}
+
+	// Read-only: what is granted and what is registered, without changing either.
+	// Reported on every page the extension runs on, because the popup and the
+	// worker console are both awkward to read from and this is the state that
+	// actually matters when a site does nothing.
+	if (msg.type === 'kbm-status') {
+		Promise.all([
+			chrome.permissions.getAll(),
+			chrome.scripting.getRegisteredContentScripts(),
+			chrome.storage.local.get('registration'),
+		]).then(([perms, scripts, stored]) => reply({
+			ok: true,
+			origins: perms.origins || [],
+			registered: scripts.filter(s => s.id.startsWith('kbm-')).map(s => s.id),
+			lastRegistration: stored.registration || null,
+		})).catch(e => reply({ ok: false, error: String(e && e.message || e) }));
+		return true;
+	}
+
+	return false;
 });
 
 chrome.runtime.onInstalled.addListener(safeSync);

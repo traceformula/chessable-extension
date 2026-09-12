@@ -346,4 +346,20 @@
 			(chrome && chrome.runtime && chrome.runtime.getManifest)
 				? chrome.runtime.getManifest().version : 'loaded';
 	} catch (e) { /* stamping is a convenience, never a requirement */ }
+
+	// And what the worker thinks is granted and registered. A site that does
+	// nothing is nearly always one of those two being empty, and neither can be
+	// seen from the page it is failing on.
+	try {
+		chrome.runtime.sendMessage({ type: 'kbm-status' }, reply => {
+			if (chrome.runtime.lastError || !reply) return;
+			try {
+				document.documentElement.dataset.kbmSites = JSON.stringify({
+					granted: reply.origins,
+					registered: reply.registered,
+					last: reply.lastRegistration,
+				}).slice(0, 2000);
+			} catch (e) { /* nothing to report */ }
+		});
+	} catch (e) { /* no worker reachable */ }
 })();

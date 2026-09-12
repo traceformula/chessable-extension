@@ -295,6 +295,50 @@
 
 	ns.clickSelection = clickSelection;
 
+	// Help for pages with no board on them. The board scripts carry a fuller
+	// panel of their own and own "?" wherever they are loaded; this covers
+	// everywhere else, which until now answered that key with nothing at all.
+	const PAGE_KEYS = [
+		[[';'], 'label everything clickable, then type a label'],
+		[['/'], 'find text on the page and click it'],
+		[['w', 's'], 'scroll up and down'],
+		[['W', 'S'], 'jump to the top or bottom'],
+		[["'"], 'click what the browser\u2019s find selected'],
+		[['esc'], 'dismiss'],
+	];
+
+	let helpPanel = null;
+
+	function closeHelp() {
+		if (helpPanel) helpPanel.remove();
+		helpPanel = null;
+	}
+
+	function showHelp() {
+		closeHelp();
+		styles();
+		helpPanel = document.createElement('div');
+		helpPanel.className = 'kbm-page-help';
+		const title = document.createElement('h4');
+		title.textContent = 'Keyboard';
+		helpPanel.appendChild(title);
+		for (const [keys, text] of PAGE_KEYS) {
+			const row = document.createElement('div');
+			const keyCell = document.createElement('b');
+			for (const key of keys) {
+				const chip = document.createElement('span');
+				chip.textContent = key;
+				keyCell.appendChild(chip);
+			}
+			const desc = document.createElement('i');
+			desc.textContent = text;
+			row.append(keyCell, desc);
+			helpPanel.appendChild(row);
+		}
+		(document.body || document.documentElement).appendChild(helpPanel);
+		setTimeout(closeHelp, 20000);
+	}
+
 	function onScroll() { ns.hints.close(); }
 
 	// Hints run in the extension's world, where the board overlay is not

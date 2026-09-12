@@ -9,9 +9,27 @@ globalThis.window = new EventTarget();
 globalThis.document = Object.assign(new EventTarget(), {
 	getElementById: () => null,
 	querySelectorAll: () => [],
-	documentElement: null,
+	documentElement: { dataset: {} },
 });
+
+// Capture the key handler as it registers, so the tests can call it directly.
+// Dispatching through EventTarget will not do: node reports a listener's
+// exception asynchronously, so a synchronous assertion sees nothing thrown and
+// the test passes over a handler that is completely broken.
+const handlers = [];
+const nativeAdd = EventTarget.prototype.addEventListener;
+EventTarget.prototype.addEventListener = function (type, listener, options) {
+	if (type === 'keydown') handlers.push(listener);
+	return nativeAdd.call(this, type, listener, options);
+};
 require('../scripts/keyboard-move/hints.js');
+// scroll.js has the same shape - one handler, every shortcut behind it - so it
+// is captured and exercised here too.
+globalThis.getComputedStyle = () => ({ overflowY: 'visible' });
+globalThis.innerHeight = 800;
+globalThis.document.scrollingElement = { scrollHeight: 100, clientHeight: 100 };
+require('../scripts/keyboard-move/scroll.js');
+EventTarget.prototype.addEventListener = nativeAdd;
 const labelsFor = globalThis.__KBM.hintLabels;
 
 let passed = 0, failed = 0;
@@ -55,6 +73,37 @@ test('single-character labels come first, where the page is most prominent', () 
 	const labels = labelsFor(26);
 	assert.strictEqual(labels[0].length, 1);
 	assert.strictEqual(labels[labels.length - 1].length, 2);
+});
+
+// The key handler is one function, so anything throwing in its opening lines
+// takes every shortcut down with it - hints, escape, find, the lot. A missing
+// declaration did exactly that and shipped: --check does not resolve
+// identifiers, and nothing here had ever invoked the handler.
+function press(key, extra) {
+	const event = Object.assign({
+		key, metaKey: false, ctrlKey: false, altKey: false, shiftKey: false,
+		target: globalThis.document, defaultPrevented: false,
+		preventDefault() { this.defaultPrevented = true; },
+		stopImmediatePropagation() { this.stopped = true; },
+	}, extra || {});
+	for (const handler of handlers) handler(event);
+	return event;
+}
+
+test('both page-layer key handlers registered themselves', () => {
+	// hints.js and scroll.js each bind window and document.
+	assert.ok(handlers.length >= 4, 'registered ' + handlers.length + ' handlers');
+});
+
+test('the key handler runs without throwing', () => {
+	// "z" is bound to nothing, so this exercises the whole preamble - the part
+	// every other key also has to survive - and stops before anything that needs
+	// a real document.
+	assert.doesNotThrow(() => press('z'));
+});
+
+test('an unhandled key is left alone', () => {
+	assert.strictEqual(press('z').defaultPrevented, false);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

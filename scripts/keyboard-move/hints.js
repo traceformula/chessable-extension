@@ -336,4 +336,14 @@
 	const nativeAdd = EventTarget.prototype.addEventListener;
 	nativeAdd.call(window, 'keydown', onKey, true);
 	nativeAdd.call(document, 'keydown', onKey, true);
+
+	// Stamp the document so it can be told from the page itself whether this
+	// loaded. Everything here runs in the extension's world, so "the key does
+	// nothing" and "nothing was ever injected" look identical from outside - and
+	// telling those apart has cost several rounds of looking in the wrong place.
+	try {
+		document.documentElement.dataset.kbmPage =
+			(chrome && chrome.runtime && chrome.runtime.getManifest)
+				? chrome.runtime.getManifest().version : 'loaded';
+	} catch (e) { /* stamping is a convenience, never a requirement */ }
 })();

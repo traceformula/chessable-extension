@@ -20,11 +20,20 @@ const msg = document.getElementById('msg');
 const diag = document.getElementById('diag');
 
 const hostOf = origin => {
-	try { return new URL(origin.replace(/\*$/, '')).hostname; } catch (e) { return origin; }
+	// "https://*.youtube.com/*" is not a parseable URL, so read the host directly
+	// and drop the wildcard: both forms of a site are shown under one name.
+	const m = /^https?:\/\/([^/]+)/.exec(String(origin));
+	return m ? m[1].replace(/^\*\./, '') : String(origin);
 };
 
-// Accepts "example.com", "www.example.com/path", or a full URL.
-function patternFor(raw) {
+// Accepts "example.com", "www.example.com/path", or a full URL, and returns both
+// patterns a site needs.
+//
+// "https://youtube.com/*" does not match www.youtube.com - Chrome match patterns
+// are host-exact - so asking for only what was typed enables the site everywhere
+// except where people actually go. The apex is requested alongside a subdomain
+// wildcard, which is one prompt either way.
+function patternsFor(raw) {
 	const text = String(raw || '').trim();
 	if (!text) return null;
 	let host;
@@ -34,7 +43,8 @@ function patternFor(raw) {
 		return null;
 	}
 	if (!host || !host.includes('.')) return null;
-	return 'https://' + host + '/*';
+	const base = host.replace(/^www\./, '');
+	return ['https://' + base + '/*', 'https://*.' + base + '/*'];
 }
 
 function say(text, bad) {
@@ -61,12 +71,21 @@ async function refresh() {
 	}
 	const registered = new Set(status.registered || []);
 
+	// Each site is two patterns; show it once.
+	const bySite = new Map();
 	for (const origin of origins) {
+		const site = hostOf(origin);
+		if (!bySite.has(site)) bySite.set(site, []);
+		bySite.get(site).push(origin);
+	}
+
+	for (const [site, patterns] of bySite) {
 		const row = document.createElement('li');
 		const name = document.createElement('span');
-		name.textContent = hostOf(origin);
-		const id = 'kbm-page-' + origin.replace(/[^a-z0-9]/gi, '_');
-		if (!registered.has(id)) {
+		name.textContent = site;
+		const anyRegistered = patterns.some(
+			o => registered.has('kbm-page-' + o.replace(/[^a-z0-9]/gi, '_')));
+		if (!anyRegistered) {
 			const warn = document.createElement('span');
 			warn.className = 'warn';
 			warn.textContent = ' — granted, but not registered';
@@ -75,8 +94,8 @@ async function refresh() {
 		const remove = document.createElement('button');
 		remove.textContent = 'Remove';
 		remove.addEventListener('click', async () => {
-			await chrome.permissions.remove({ origins: [origin] });
-			say('Removed ' + hostOf(origin) + '.');
+			await chrome.permissions.remove({ origins: patterns });
+			say('Removed ' + site + '.');
 			refresh();
 		});
 		row.append(name, remove);
@@ -93,13 +112,14 @@ async function refresh() {
 
 form.addEventListener('submit', async event => {
 	event.preventDefault();
-	const pattern = patternFor(hostInput.value);
-	if (!pattern) { say('That does not look like a site address.', true); return; }
-	if (BUILT_IN.includes(hostOf(pattern))) { say(hostOf(pattern) + ' is already built in.'); return; }
+	const patterns = patternsFor(hostInput.value);
+	if (!patterns) { say('That does not look like a site address.', true); return; }
+	const label = hostOf(patterns[0]);
+	if (BUILT_IN.includes(label)) { say(label + ' is already built in.'); return; }
 
 	let granted = false;
 	try {
-		granted = await chrome.permissions.request({ origins: [pattern] });
+		granted = await chrome.permissions.request({ origins: patterns });
 	} catch (e) {
 		say('Chrome refused the request: ' + String(e && e.message || e), true);
 		return;
@@ -109,7 +129,7 @@ form.addEventListener('submit', async event => {
 	// Register straight away rather than relying on the permissions event.
 	try { await chrome.runtime.sendMessage({ type: 'kbm-sync' }); } catch (e) { /* shown below */ }
 	hostInput.value = '';
-	say('Added ' + hostOf(pattern) + '. Reload any open tab on that site to start using it.');
+	say('Added ' + label + '. Reload any open tab on that site to start using it.');
 	refresh();
 });
 

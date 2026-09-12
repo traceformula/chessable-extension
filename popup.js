@@ -43,7 +43,10 @@ const siteState = document.getElementById('siteState');
 const diag = document.getElementById('diag');
 
 const hostOf = origin => {
-	try { return new URL(origin.replace(/\*$/, '')).hostname; } catch (e) { return origin; }
+	// "https://*.youtube.com/*" is not a parseable URL, so read the host directly
+	// and drop the wildcard: both forms of a site are shown under one name.
+	const m = /^https?:\/\/([^/]+)/.exec(String(origin));
+	return m ? m[1].replace(/^\*\./, '') : String(origin);
 };
 
 function report(lines, bad) {
@@ -81,29 +84,38 @@ async function render() {
 		bad = true;
 	}
 
+	// Each site is granted as two patterns - the apex and a subdomain wildcard -
+	// so list it once.
+	const bySite = new Map();
+	for (const origin of granted) {
+		const site = hostOf(origin);
+		if (!bySite.has(site)) bySite.set(site, []);
+		bySite.get(site).push(origin);
+	}
+
 	siteList.textContent = '';
-	for (const origin of granted.sort()) {
+	for (const [site, patterns] of [...bySite].sort()) {
 		const row = document.createElement('li');
 		const name = document.createElement('span');
-		name.textContent = hostOf(origin);
-		if (!registered.has('kbm-page-' + origin.replace(/[^a-z0-9]/gi, '_'))) {
+		name.textContent = site;
+		if (!patterns.some(o => registered.has('kbm-page-' + o.replace(/[^a-z0-9]/gi, '_')))) {
 			const warn = document.createElement('small');
 			warn.textContent = ' — not registered';
 			warn.style.color = '#c0504a';
 			name.appendChild(warn);
-			notes.push(hostOf(origin) + ': granted but not registered');
+			notes.push(site + ': granted but not registered');
 			bad = true;
 		}
 		const remove = document.createElement('button');
 		remove.textContent = 'remove';
 		remove.addEventListener('click', async () => {
-			await chrome.permissions.remove({ origins: [origin] });
+			await chrome.permissions.remove({ origins: patterns });
 			render();
 		});
 		row.append(name, remove);
 		siteList.appendChild(row);
 	}
-	if (!granted.length) notes.push('no extra sites added yet');
+	if (!bySite.size) notes.push('no extra sites added yet');
 	report(notes, bad);
 
 	const tab = await currentTab();
@@ -114,7 +126,7 @@ async function render() {
 		siteState.textContent = 'Runs on the chess sites. Add others below.';
 	} else if (BUILT_IN.includes(url.hostname)) {
 		siteState.textContent = url.hostname + ' is built in.';
-	} else if (granted.includes('https://' + url.hostname + '/*')) {
+	} else if (granted.some(o => hostOf(o) === url.hostname.replace(/^www\./, ''))) {
 		siteState.textContent = url.hostname + ' is enabled.';
 	} else {
 		siteState.textContent = url.hostname + ' is not enabled yet.';

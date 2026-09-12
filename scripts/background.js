@@ -19,7 +19,9 @@ const BUILT_IN = [
 ];
 
 function hostOf(origin) {
-	try { return new URL(origin.replace(/\*$/, '')).hostname; } catch (e) { return null; }
+	// "https://*.youtube.com/*" is not a parseable URL, so read the host directly.
+	const m = /^https?:\/\/([^/]+)/.exec(String(origin));
+	return m ? m[1].replace(/^\*\./, '') : null;
 }
 
 function isBuiltIn(origin) {

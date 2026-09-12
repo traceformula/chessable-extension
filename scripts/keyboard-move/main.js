@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.23.1';
+	ns.version = '1.23.2';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -135,25 +135,7 @@
 		// play() resolves only once the position has actually changed, so a move
 		// that went nowhere is reported rather than left looking successful.
 		const site = adapter();
-		if (!site) {
-			// Loaded on a page of this site that has no board - a news article, a
-			// forum thread. "?" is claimed here, so it has to be answered here too,
-			// with the keys that do work.
-			if (e.key === '?') {
-				e.preventDefault();
-				ns.hud.help([
-					{ group: 'Page', rows: [
-						[';', 'label everything clickable, then type a label'],
-						['/', 'find text on the page and click it'],
-						[['w', 's'], 'scroll up and down'],
-						[['W', 'S'], 'jump to the top or bottom'],
-					] },
-					'No board on this page, so there is nothing to type moves at.',
-				]);
-				scheduleHide('help');
-			}
-			return;
-		}
+		if (!site) return;
 		Promise.resolve(site.play(move)).then(played => {
 			if (played) return;
 			tail = null;
@@ -293,6 +275,14 @@
 					'No board on this page, so there is nothing to type moves at.',
 				]);
 				scheduleHide('help');
+				return;
+			}
+			// Dismissal has to be handled here too. Everything below is skipped
+			// without a board, so the overlay opened just above would otherwise
+			// stay until its timer ran out.
+			if (e.key === 'Escape' && ns.hud.isOpen()) {
+				e.preventDefault();
+				reset();
 			}
 			return;
 		}

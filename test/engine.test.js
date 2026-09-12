@@ -163,5 +163,64 @@ test('an origin square does not commit the move that starts there', () => {
 	assert.strictEqual(typeOut('b6b5', moves).played, 'b5');
 });
 
+// lichess publishes its own legality as a dests map on the chessground state.
+// We generate locally for the SAN and then filter against it, so that a castling
+// right deduced wrongly from piece placement cannot produce a move lichess would
+// refuse. Data below was taken from a live analysis board.
+const LICHESS_FEN = 'r1bqk1nr/pppp1ppp/2n5/2b1p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 4 4';
+const LICHESS_DESTS = new Map(Object.entries({
+	b1: 'a3,c3', d1: 'e2', e1: 'f1,h1,e2,g1', h1: 'f1,g1', a2: 'a3,a4',
+	b2: 'b3,b4', c2: 'c3', d2: 'd3,d4', g2: 'g3,g4', h2: 'h3,h4',
+	f3: 'g1,d4,h4,e5,g5', c4: 'f1,e2,b3,d3,b5,d5,a6,e6,f7',
+}).map(([k, v]) => [k, v.split(',')]));
+
+const filterByDests = (moves, dests) =>
+	moves.filter(m => (dests.get(m.from) || []).includes(m.to));
+
+test('filtering by lichess dests drops nothing that is really legal', () => {
+	const moves = legal(LICHESS_FEN);
+	assert.strictEqual(filterByDests(moves, LICHESS_DESTS).length, moves.length);
+});
+
+test('castling survives lichess encoding it as king-to-rook', () => {
+	// lichess lists e1->h1 as well as e1->g1. Ours is only ever e1->g1, so the
+	// filter has to keep it on the strength of that entry alone.
+	const kept = filterByDests(legal(LICHESS_FEN), LICHESS_DESTS);
+	assert.ok(kept.some(m => m.san === 'O-O'), kept.map(m => m.san).join(' '));
+	assert.strictEqual(typeOut('oo', kept).played, 'O-O');
+});
+
+// Castling rights are absent from chessground's placement-only FEN, so on a
+// board that does not publish a full one they are deduced from where the kings
+// and rooks stand.
+function deduceCastling(placement) {
+	const rows = placement.split('/');
+	const expand = r => r.replace(/\d/g, d => '.'.repeat(Number(d)));
+	const back = expand(rows[7] || ''), front = expand(rows[0] || '');
+	let out = '';
+	if (back[4] === 'K' && back[7] === 'R') out += 'K';
+	if (back[4] === 'K' && back[0] === 'R') out += 'Q';
+	if (front[4] === 'k' && front[7] === 'r') out += 'k';
+	if (front[4] === 'k' && front[0] === 'r') out += 'q';
+	return out || '-';
+}
+
+test('castling rights are deduced correctly from placement', () => {
+	assert.strictEqual(deduceCastling(LICHESS_FEN.split(' ')[0]), 'KQkq');
+	assert.strictEqual(deduceCastling('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR'), 'KQkq');
+	// King off e1, rooks home: no white rights.
+	assert.strictEqual(deduceCastling('r3k2r/8/8/8/8/8/8/R4RK1'), 'kq');
+	assert.strictEqual(deduceCastling('4k3/8/8/8/8/8/8/4K3'), '-');
+});
+
+test('a rebuilt FEN yields the same moves as the published one', () => {
+	// The path a game page takes, where no full FEN is on the page.
+	const placement = LICHESS_FEN.split(' ')[0];
+	const rebuilt = placement + ' w ' + deduceCastling(placement) + ' - 0 1';
+	assert.deepStrictEqual(
+		legal(rebuilt).map(m => m.san).sort(),
+		legal(LICHESS_FEN).map(m => m.san).sort());
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

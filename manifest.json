@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chess Utility Extension",
   "description": "Keyboard move input for chess.com, plus Chessable helpers",
-  "version": "1.15.0",
+  "version": "1.16.0",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -82,6 +82,20 @@
       "matches": [
         "https://www.clubxiangqi.com/webapp/*"
       ],
+      "run_at": "document_start"
+    },
+    {
+      "js": [
+        "scripts/keyboard-move/vendor/chess.js",
+        "scripts/keyboard-move/matcher.js",
+        "scripts/keyboard-move/hud.js",
+        "scripts/keyboard-move/lichess.js",
+        "scripts/keyboard-move/main.js"
+      ],
+      "matches": [
+        "https://lichess.org/*"
+      ],
+      "world": "MAIN",
       "run_at": "document_start"
     },
     {

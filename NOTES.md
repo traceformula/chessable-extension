@@ -21,13 +21,34 @@ corrupted by playing moves for both colours.
 
 Both need one clean game against a real opponent.
 
-## Next feature: lichess
+## lichess: analysis works, games do not
 
-This was half the original scope and is entirely unbuilt. The core — matcher,
-engine, overlay, key handling, adapter selection — is already site-independent,
-so this is an adapter plus one unsolved question, not a rewrite.
+The adapter exists as of v1.16.0. Analysis and study boards are fully working.
+Game pages are not, and it is not obvious that they can be.
 
-What the de-risk established:
+Moves are generated locally from the FEN and then filtered against
+chessground's own `state.movable.dests`, which is lichess's legality rather
+than ours - that covers castling rights being deduced wrongly when no full FEN
+is published. Verified against a live board: 33 generated, 33 surviving the
+filter, `O-O` kept even though lichess encodes castling as `e1->h1` as well as
+`e1->g1`.
+
+**The game-page transport is unsolved.** Four ways of driving lichess's own
+keyboard-move box were tried on an analysis board and none moved a piece:
+setting `value` then Enter as keydown, as keypress, as keyup, and typing
+character by character with a full event set per character. Synthetic mouse
+events on chessground are refused the same way. The likeliest explanation is an
+`isTrusted` check - chessground definitely does this for drags - but it could
+not be confirmed, because redefining `Event.prototype.isTrusted` from the
+console had no effect either.
+
+Worth trying next, in order: the `isTrusted` override from a real MAIN-world
+content script at `document_start`, where it persists and may behave
+differently from a console context; then `chrome.debugger`, which produces
+genuinely trusted events at the cost of a permanent "Chrome is being debugged"
+banner.
+
+What the original de-risk established:
 
 - **Analysis boards are solved.** `site.analysis` exposes the controller:
   `userMove(orig, dest)` plays, `chessground.getFen()` gives placement (not a

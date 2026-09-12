@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.15.0';
+	ns.version = '1.16.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -391,10 +391,13 @@
 			Home: 'toStart', End: 'toEnd',
 		};
 		if (NAV[e.key]) {
+			// Only swallow the key if the adapter actually did something. lichess
+			// binds the arrows itself and does it well, so its adapter declines and
+			// the keypress carries on to the site.
+			if (!site[NAV[e.key]]()) return;
 			e.preventDefault();
 			e.stopPropagation();
 			reset();
-			site[NAV[e.key]]();
 			return;
 		}
 

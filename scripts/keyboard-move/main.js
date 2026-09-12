@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.22.0';
+	ns.version = '1.23.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -135,7 +135,25 @@
 		// play() resolves only once the position has actually changed, so a move
 		// that went nowhere is reported rather than left looking successful.
 		const site = adapter();
-		if (!site) return;
+		if (!site) {
+			// Loaded on a page of this site that has no board - a news article, a
+			// forum thread. "?" is claimed here, so it has to be answered here too,
+			// with the keys that do work.
+			if (e.key === '?') {
+				e.preventDefault();
+				ns.hud.help([
+					{ group: 'Page', rows: [
+						[';', 'label everything clickable, then type a label'],
+						['/', 'find text on the page and click it'],
+						[['w', 's'], 'scroll up and down'],
+						[['W', 'S'], 'jump to the top or bottom'],
+					] },
+					'No board on this page, so there is nothing to type moves at.',
+				]);
+				scheduleHide('help');
+			}
+			return;
+		}
 		Promise.resolve(site.play(move)).then(played => {
 			if (played) return;
 			tail = null;
@@ -259,7 +277,25 @@
 		if (document.documentElement.dataset.kbmHints === '1') return;
 
 		const site = adapter();
-		if (!site) return;
+		if (!site) {
+			// Loaded on a page of this site that has no board - a news article, a
+			// forum thread. "?" is claimed here, so it has to be answered here too,
+			// with the keys that do work.
+			if (e.key === '?') {
+				e.preventDefault();
+				ns.hud.help([
+					{ group: 'Page', rows: [
+						[';', 'label everything clickable, then type a label'],
+						['/', 'find text on the page and click it'],
+						[['w', 's'], 'scroll up and down'],
+						[['W', 'S'], 'jump to the top or bottom'],
+					] },
+					'No board on this page, so there is nothing to type moves at.',
+				]);
+				scheduleHide('help');
+			}
+			return;
+		}
 
 		// Escape returns from the chat line to the board. Every other key typed in
 		// a text field is the site's, so chat still works normally.
@@ -576,6 +612,10 @@
 	// the path, which matters for keys the site also wants. chess.com closes its
 	// dialogs on Escape, and a handler above us that stops propagation would take
 	// the key before a document-only listener ever saw it.
+	// Tells the page-navigation scripts that "?" is answered here. They run in
+	// the other world on some sites, so the DOM is the only thing both can read.
+	try { document.documentElement.dataset.kbmBoardScripts = '1'; } catch (e) { /* not yet */ }
+
 	const nativeAdd = EventTarget.prototype.addEventListener;
 	nativeAdd.call(window, 'keydown', onKey, true);
 	nativeAdd.call(document, 'keydown', onKey, true);

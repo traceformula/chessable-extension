@@ -61,6 +61,9 @@ keyboard-move box does not respond to anything synthetic.
 | `↑` `↓` (`Home` `End`) | jump to start / end of the line |
 | `u` | take back a move |
 | `?` | show the keys, and whether premoves are on |
+
+On a page with no board — a news article, or any site you have added — `?`
+lists only the keys that work there, rather than notation you cannot use.
 | `Esc` | clear what you have typed, or dismiss the overlay |
 
 Typing is ignored when it is not your turn, when the focus is in a text field

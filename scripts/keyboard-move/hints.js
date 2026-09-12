@@ -43,6 +43,29 @@
 	white-space: nowrap;
 }
 .kbm-hint .kbm-hint-done { opacity: .35; }
+.kbm-page-help {
+	position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+	z-index: 2147483600; pointer-events: none;
+	padding: 15px 18px 16px; border-radius: 10px;
+	max-width: min(94vw, 460px);
+	background: #121214; color: #f4f4f4;
+	border: 1px solid rgba(255,255,255,.09);
+	box-shadow: 0 10px 30px rgba(0,0,0,.5);
+	font: 13px/1.45 system-ui, -apple-system, sans-serif;
+}
+.kbm-page-help h4 {
+	margin: 0 0 8px; font-size: 10.5px; font-weight: 600;
+	text-transform: uppercase; letter-spacing: .09em; opacity: .58;
+}
+.kbm-page-help div { display: flex; gap: 12px; align-items: baseline; padding: 2.5px 0; }
+.kbm-page-help b {
+	flex: 0 0 74px; display: flex; gap: 4px;
+}
+.kbm-page-help b span {
+	padding: 1.5px 6px; border-radius: 4px; background: rgba(255,255,255,.13);
+	font: 11.5px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 400;
+}
+.kbm-page-help i { font-style: normal; opacity: .9; }
 .kbm-hint-notice {
 	position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
 	z-index: 2147483600; pointer-events: none;
@@ -387,12 +410,25 @@
 		e.__kbmHintSeen = true;
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+		// Any key dismisses the help panel, which is the whole of its interaction.
+		if (helpPanel) { closeHelp(); if (e.key === 'Escape') { e.preventDefault(); return; } }
+
 		if (ns.find && ns.find.isOpen()) return;   // the find bar owns the keyboard
 		if (ns.hints.isActive()) {
 			if (ns.hints.handleKey(e)) e.stopImmediatePropagation();
 			return;
 		}
 		if (editable(e.target)) return;
+
+		// "?" lists the keys that work here. Skipped where the board scripts are
+		// loaded: those answer it with a fuller panel that also covers moves, and
+		// two panels would fight over the same corner.
+		if (e.key === '?' && !document.documentElement.dataset.kbmBoardScripts) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			showHelp();
+			return;
+		}
 
 		// "/" searches the page and clicks a match. Ours rather than the browser's,
 		// which cannot hand over a match inside user-select: none.

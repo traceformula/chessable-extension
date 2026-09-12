@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.21.2';
+	ns.version = '1.22.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -312,9 +312,10 @@
 
 			// Lobby shortcuts. A move always begins with a file digit, so a letter
 			// typed with an empty buffer cannot be part of one and is free to mean
-			// something else. "/" focuses the chat line, as it does most places.
+			// something else. Chat is "m" for message: "/" belongs to find, which
+			// works the same way on every site.
 			if (!buffer) {
-				if (e.key === '/') {
+				if (e.key === 'm') {
 					e.preventDefault();
 					const ok = site.focusChat && site.focusChat();
 					if (!ok) {
@@ -365,7 +366,7 @@
 					{ group: 'Lobby', rows: [
 						['f', 'findtable'], ['r', 'rooms'], ['n', 'new tables'],
 						['t', 'tables'], ['j', 'join'], ['o', 'options'],
-						['/', 'type in chat'],
+						['m', 'type in chat'],
 						['esc', 'leave chat, or clear what you typed'],
 					] },
 					{ group: 'Table', rows: [
@@ -434,7 +435,7 @@
 				] },
 				{ group: 'Page', rows: [
 					[';', 'label everything clickable, then type a label'],
-					["'", 'click what find selected \u2014 cmd+f, type, esc, then \u2019'],
+					['/', 'find text on the page and click it'],
 					[['w', 's'], 'scroll up and down'],
 					[['W', 'S'], 'jump to the top or bottom'],
 				] },

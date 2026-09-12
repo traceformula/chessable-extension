@@ -387,19 +387,30 @@
 		e.__kbmHintSeen = true;
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+		if (ns.find && ns.find.isOpen()) return;   // the find bar owns the keyboard
 		if (ns.hints.isActive()) {
 			if (ns.hints.handleKey(e)) e.stopImmediatePropagation();
 			return;
 		}
 		if (editable(e.target)) return;
 
-		// "'" clicks whatever the browser's find has selected.
+		// "/" searches the page and clicks a match. Ours rather than the browser's,
+		// which cannot hand over a match inside user-select: none.
+		if (e.key === '/' && ns.find) {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			ns.find.open();
+			return;
+		}
+
+		// "'" still clicks whatever the browser's own find selected, for anyone
+		// already in that habit. It only reaches selectable text.
 		if (e.key === "'") {
 			e.preventDefault();
 			e.stopImmediatePropagation();
 			const result = clickSelection();
 			if (result === 'none') {
-				notice('no selection \u2014 buttons and menus cannot be selected; use ; instead');
+				notice('no selection \u2014 try / instead, which searches the page itself');
 			}
 			else if (result === 'nothing') notice('that text is not clickable');
 			return;

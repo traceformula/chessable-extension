@@ -7,7 +7,11 @@
 //
 // Only page navigation extends this way. The board adapters are specific to one
 // site's internals and have nothing to offer an arbitrary page.
-const PAGE_JS = ['scripts/keyboard-move/hints.js', 'scripts/keyboard-move/scroll.js'];
+const PAGE_JS = [
+	'scripts/keyboard-move/find.js',
+	'scripts/keyboard-move/hints.js',
+	'scripts/keyboard-move/scroll.js',
+];
 const PROBE_JS = ['scripts/keyboard-move/clickable-probe.js'];
 
 // Already covered by the manifest; registering them again would double up.

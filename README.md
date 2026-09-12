@@ -100,7 +100,7 @@ cannot be part of one:
 | `t` | tables |
 | `j` | Join! |
 | `o` | Options |
-| `/` | focus the chat line |
+| `m` | type in chat |
 | `Esc` | from chat, back to the board |
 | `q` | resign |
 | `=` | offer a draw |
@@ -174,28 +174,31 @@ Same-origin frames are hinted together with the page holding them, so on
 Chessable one press covers both the site navigation and the board's own
 controls. Cross-origin frames cannot be reached and are skipped.
 
-### Clicking what you searched for
+### Finding and clicking text
 
-Chrome's find-in-page highlight is drawn by the browser and is not in the page,
-but the match it lands on is left as the document selection — which is
-readable. So:
+Press `/`, type what you can see, press Enter. The match is clicked.
 
-**`Cmd+F`** → type → **`Esc`** → **`'`**
+| Key | Does |
+| --- | --- |
+| `/` | open the find bar |
+| `↑` `↓` (or Tab) | move between matches |
+| `Enter` | click the current match |
+| `Esc` | cancel |
 
-and the link that text belongs to is clicked. The `Esc` matters: while the find
-bar is open the match is Chrome's own highlight, and it only becomes a
-selection once the bar closes.
+This is a search of our own rather than the browser's, for a specific reason.
+Chrome's find highlight is not in the page, and the match only becomes a
+selection when the text is selectable — which buttons, menus and navigation
+almost never are, since they set `user-select: none`. A `Range` is unaffected by
+that, so measuring a match works on exactly the controls the browser's find
+cannot hand over.
 
-The selection is a run of text rather than an element, so the click goes to the
-nearest ancestor that is actually clickable — a declared link or button first,
-and only then something weaker like a pointer cursor, since that is inherited by
-every span inside a link.
+The click goes to a **point** rather than to an element: whatever
+`elementFromPoint` returns at the middle of the match is what a mouse would have
+hit, including anything layered on top. Matches inside same-origin frames are
+found too.
 
-**This works on prose, not on controls.** Text inside an element with
-`user-select: none` can be found and highlighted by the browser but cannot
-become a selection, and that property is set on most buttons, menu items and
-navigation. On those, `'` reports that there is no selection — use `;` instead,
-which does not depend on the text being selectable.
+`'` still clicks whatever Chrome's own find left selected, which works on prose
+and not on controls. `/` is the one to reach for.
 
 ### Scrolling
 

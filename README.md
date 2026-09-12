@@ -129,13 +129,19 @@ Chessable explore boards have no opponent and no premoves.
 cancels, `Backspace` corrects. Text fields are focused rather than clicked. If
 nothing on the page can be clicked, it says so rather than doing nothing.
 
-Clickability is judged two ways. Declared markup — a link, a button, an ARIA
-role — is trusted first. Everything else is found by its pointer cursor, which
-is the only signal an application built from bare divs gives: the xiangqi
-client is compiled from Java and its table rows carry no role, href or
-tabindex at all. Since a pointer cursor is inherited, a declared element always
-wins over the box drawn around it, so a link never fragments into separate
-hints for its icon and its text.
+Clickability is judged three ways, because some applications give nothing away
+in their markup. Declared markup — a link, a button, an ARIA role — is trusted
+first. Then a pointer cursor. Then the handler itself: `clickable-probe.js`
+runs in the page before the application does, wraps `addEventListener` to tag
+whatever registers a click, and sweeps for the expandos frameworks leave on
+their widgets when they dispatch centrally instead. GWT does exactly that, so
+the xiangqi table rows are clickable without a role, an href, a tabindex or
+even a pointer cursor.
+
+Since a pointer cursor is inherited, a declared element always wins over the
+box drawn around it, so a link never fragments into separate hints for its icon
+and its text. Anything the size of the page is skipped: a handler that big is
+delegation, not a target.
 
 It is `;` and not Vimium's `f` because `f` is a file letter — binding it would
 break `f4` and `Nf3` outright.

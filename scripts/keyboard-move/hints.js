@@ -23,6 +23,9 @@
 		'[role="button"]', '[role="link"]', '[role="tab"]', '[role="checkbox"]',
 		'[role="menuitem"]', '[role="option"]', '[onclick]',
 		'[tabindex]:not([tabindex="-1"])',
+		// Tagged by clickable-probe.js: the element registered a click handler in
+		// code, which is the only trace an application built from bare divs leaves.
+		'[data-kbm-click]',
 	].join(',');
 
 	const CSS = `
@@ -120,6 +123,9 @@
 			// client is compiled from Java - is the only signal there is.
 			const declared = el.matches(CLICKABLE);
 			if (!declared && style.cursor !== 'pointer') continue;
+			// A handler on something the size of the page is delegation, not a
+			// target: hinting it would put one label over the whole screen.
+			if (rect.width > view.innerWidth * 0.9 && rect.height > view.innerHeight * 0.6) continue;
 			if (!onTop(doc, el, rect, view)) continue;
 			out.push({ el, declared, left: rect.left + dx, top: rect.top + dy });
 		}
@@ -221,6 +227,13 @@
 
 		open() {
 			this.close();
+			// Ask the page-world probe to tag anything whose click handler is not
+			// visible from here - GWT widgets carry theirs as a JS expando. The
+			// event is delivered synchronously, so the tags are in place below.
+			try {
+				document.dispatchEvent(new CustomEvent('kbm-tag-clickables'));
+			} catch (e) { /* no probe on this page: markup and cursor still apply */ }
+
 			const raw = [];
 			collect(document, 0, 0, raw, 0);
 			const found = prune(raw);

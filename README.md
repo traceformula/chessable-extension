@@ -1,17 +1,24 @@
-# Chess Utility Extension
+# Chess Utility
 
-A Chrome extension with two conveniences:
+A Chrome extension for playing chess and moving around the web without a mouse.
 
-- **Keyboard move input** — play by typing instead of dragging pieces, on
-  chess.com boards, Chessable explore boards, and clubxiangqi.com.
-- **Find position in course** — on a Chessable explore page, jump to the
-  current position inside the course.
+- **Type moves instead of dragging them** — on chess.com boards, Chessable
+  explore boards, lichess analysis boards, and the clubxiangqi client.
+- **Work any page from the keyboard** — label everything clickable and pick one,
+  scroll, and click whatever find-in-page just landed on. On the chess sites by
+  default, and on any other site you add.
+- **Find position in course** — on a Chessable explore page, jump to the current
+  position inside the course.
+
+Nothing leaves the browser, and the only permission requested at install is
+storage. Sites beyond the chess ones are granted one at a time, by you.
 
 ## Playing by keyboard
 
-Type a move on any chess.com board or Chessable explore board. A move plays as soon as what you have
-typed can no longer become any other legal move, so `e4` takes two keystrokes
-and needs no Enter. Anything you type after that which still spells the move
+Type a move on a chess.com board, a Chessable explore board, or a lichess
+analysis board; the xiangqi client takes squares instead, described below. A
+move plays as soon as what you have typed can no longer become any other legal
+move, so `e4` takes two keystrokes and needs no Enter. Anything you type after that which still spells the move
 you just played is absorbed, so a trailing `+` or `=Q` does not leak into the
 next move.
 
@@ -32,6 +39,19 @@ Input is forgiving:
 | `e8` | promotes to a queen; `e8n` for a knight |
 | `Rgxg6`, `R8xg6`, `Rg8xg6` | any disambiguator that identifies the origin |
 | `Rxg6` | ambiguous — both candidates are shown, nothing is played |
+
+### Where it works
+
+| Site | Moves | Notes |
+| --- | --- | --- |
+| chess.com | notation | games, puzzles, analysis; premoves available |
+| Chessable | notation | explore boards |
+| lichess | notation | analysis and study boards only — see below |
+| clubxiangqi | two squares | xiangqi; lobby and table shortcuts too |
+
+On a lichess **game** page the board reports itself unplayable rather than
+dropping moves silently: lichess exposes no controller there, and its own
+keyboard-move box does not respond to anything synthetic.
 
 ### Keys
 

@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.14.1';
+	ns.version = '1.15.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -252,6 +252,12 @@
 
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+		// Link hints own the keyboard while they are up, and their labels are made
+		// of letters that are also notation. They run in the extension's world
+		// while this may run in the page's, so the flag is read off the document
+		// rather than shared directly.
+		if (document.documentElement.dataset.kbmHints === '1') return;
+
 		const site = adapter();
 		if (!site) return;
 
@@ -353,6 +359,8 @@
 					] },
 					{ group: 'Page', rows: [
 						[';', 'label everything clickable, then type a label'],
+						[['w', 's'], 'scroll up and down'],
+						[['W', 'S'], 'jump to the top or bottom'],
 					] },
 					{ group: 'Lobby', rows: [
 						['f', 'findtable'], ['r', 'rooms'], ['n', 'new tables'],
@@ -423,6 +431,8 @@
 				] },
 				{ group: 'Page', rows: [
 					[';', 'label everything clickable, then type a label'],
+					[['w', 's'], 'scroll up and down'],
+					[['W', 'S'], 'jump to the top or bottom'],
 				] },
 				{ group: 'Premoves', rows: [[
 					premoves ? (settings.premove ? 'on' : 'off') : 'n/a',

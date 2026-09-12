@@ -139,6 +139,22 @@ Same-origin frames are hinted together with the page holding them, so on
 Chessable one press covers both the site navigation and the board's own
 controls. Cross-origin frames cannot be reached and are skipped.
 
+### Scrolling
+
+| Key | Does |
+| --- | --- |
+| `w` `s` | scroll up and down |
+| `W` `S` | jump to the top or bottom |
+
+Not vim's `j`/`k`: on a chess board `k` is the king (`Kf1`, `Kxd4`), and on the
+xiangqi client `j` is a rank letter, so neither half of that pair is free. `w`
+and `s` are unused by every notation here.
+
+Whatever the focus sits inside is scrolled in preference to the page, and if
+the document itself does not scroll the largest scrolling panel on screen is
+used — board pages are often a fixed shell around one scrolling column, where
+scrolling the document does nothing at all.
+
 ### Settings
 
 Click the extension's toolbar icon. Two settings, both stored in

@@ -174,6 +174,10 @@
 				return { el: item.el, label: labels[i], node };
 			});
 			(document.body || document.documentElement).appendChild(layer);
+			// Flagged on the document so the board scripts can see it. They run in
+			// the page's world while this runs in the extension's, so a shared
+			// variable is not available to both - but the DOM is.
+			document.documentElement.dataset.kbmHints = '1';
 			typed = '';
 			render();
 			// Any scroll invalidates every position, so close rather than lie.
@@ -182,6 +186,7 @@
 		},
 
 		close() {
+			delete document.documentElement.dataset.kbmHints;
 			removeEventListener('scroll', onScroll, { capture: true });
 			if (layer) layer.remove();
 			layer = null;

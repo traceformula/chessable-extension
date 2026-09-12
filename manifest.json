@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Chess Utility Extension",
   "description": "Keyboard move input for chess.com, plus Chessable helpers",
-  "version": "1.14.1",
+  "version": "1.15.0",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -38,7 +38,6 @@
         "scripts/keyboard-move/matcher.js",
         "scripts/keyboard-move/hud.js",
         "scripts/keyboard-move/chesscom.js",
-        "scripts/keyboard-move/hints.js",
         "scripts/keyboard-move/main.js"
       ],
       "matches": [
@@ -53,7 +52,6 @@
         "scripts/keyboard-move/matcher.js",
         "scripts/keyboard-move/hud.js",
         "scripts/keyboard-move/chessable.js",
-        "scripts/keyboard-move/hints.js",
         "scripts/keyboard-move/main.js"
       ],
       "matches": [
@@ -65,7 +63,6 @@
     },
     {
       "js": [
-        "scripts/keyboard-move/hints.js",
         "scripts/keyboard-move/chessable-relay.js"
       ],
       "matches": [
@@ -80,7 +77,6 @@
         "scripts/keyboard-move/matcher.js",
         "scripts/keyboard-move/hud.js",
         "scripts/keyboard-move/clubxiangqi.js",
-        "scripts/keyboard-move/hints.js",
         "scripts/keyboard-move/main.js"
       ],
       "matches": [
@@ -95,6 +91,21 @@
       "matches": [
         "https://www.chess.com/*",
         "https://www.chessable.com/mt1/*"
+      ],
+      "all_frames": true,
+      "run_at": "document_start"
+    },
+    {
+      "js": [
+        "scripts/keyboard-move/hints.js",
+        "scripts/keyboard-move/scroll.js"
+      ],
+      "matches": [
+        "https://www.chess.com/*",
+        "https://www.chessable.com/*",
+        "https://chessable.com/*",
+        "https://lichess.org/*",
+        "https://www.clubxiangqi.com/*"
       ],
       "all_frames": true,
       "run_at": "document_start"

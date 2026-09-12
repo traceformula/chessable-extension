@@ -47,6 +47,13 @@
 		display: flex; align-items: center; justify-content: space-between;
 		gap: 8px; padding: 3px 0; font-size: 12px;
 	}
+	pre#diag {
+		margin: 8px 0 0; padding: 7px 8px; border-radius: 6px;
+		background: rgba(127,127,127,.12); font-size: 10.5px; line-height: 1.4;
+		white-space: pre-wrap; word-break: break-word; opacity: .85;
+	}
+	pre#diag:empty { display: none; }
+	pre#diag.bad { background: rgba(192,80,74,.16); color: #e0827c; }
 	ul li button {
 		font: inherit; cursor: pointer; border: 0; background: none;
 		color: #c0504a; padding: 0 2px;
@@ -107,6 +114,7 @@
 <p class="hint" id="siteState">Keyboard navigation runs on the chess sites automatically.</p>
 <button id="addSite" class="add" hidden></button>
 <ul id="siteList"></ul>
+<pre id="diag"></pre>
 
 <footer>Settings sync with your Chrome profile. Reload an open tab to apply.</footer>
 <script src="popup.js"></script>

@@ -70,10 +70,38 @@ function problemWith(entry) {
 	return bad.map(k => entry[k] || 'not registered').join('; ');
 }
 
+// Everything the popup knows, written where it can be read. The failures so far
+// have all been invisible ones, and an empty site list looks exactly like a
+// working extension with no extra sites.
+const diag = document.getElementById('diag');
+
+function report(lines, bad) {
+	diag.textContent = lines.filter(Boolean).join('\n');
+	diag.classList.toggle('bad', !!bad);
+}
+
 async function render() {
+	const all = await chrome.permissions.getAll().catch(e => ({ error: e }));
 	const granted = await grantedOrigins();
 	const result = await syncNow();
 	const status = (result && result.status) || {};
+
+	const notes = [];
+	let bad = false;
+	if (!result || result.ok !== true) {
+		notes.push('worker: NOT RESPONDING' + (result && result.error ? ' (' + result.error + ')' : ''));
+		bad = true;
+	}
+	if (all && all.error) {
+		notes.push('permissions: ' + String(all.error.message || all.error));
+		bad = true;
+	} else if (!granted.length) {
+		notes.push('no extra sites granted yet');
+	}
+	for (const origin of granted) {
+		const problem = problemWith(status[origin]);
+		if (problem) { notes.push(hostOf(origin) + ': ' + problem); bad = true; }
+	}
 
 	siteList.textContent = '';
 	for (const origin of granted.sort()) {
@@ -92,11 +120,19 @@ async function render() {
 		remove.textContent = 'remove';
 		remove.addEventListener('click', async () => {
 			await chrome.permissions.remove({ origins: [origin] });
-			render();
+			render().catch(e => {
+	// A throw here used to leave the section blank, which reads as "nothing to
+	// report" rather than "this broke".
+	const el = document.getElementById('diag');
+	el.textContent = 'popup error: ' + String(e && e.message || e);
+	el.classList.add('bad');
+});
 		});
 		row.append(name, remove);
 		siteList.appendChild(row);
 	}
+
+	report(notes, bad);
 
 	const tab = await currentTab();
 	let url = null;
@@ -133,8 +169,20 @@ async function render() {
 			await syncNow();
 			siteState.textContent = 'Enabled. Reload the page to start using it.';
 		}
-		render();
+		render().catch(e => {
+	// A throw here used to leave the section blank, which reads as "nothing to
+	// report" rather than "this broke".
+	const el = document.getElementById('diag');
+	el.textContent = 'popup error: ' + String(e && e.message || e);
+	el.classList.add('bad');
+});
 	};
 }
 
-render();
+render().catch(e => {
+	// A throw here used to leave the section blank, which reads as "nothing to
+	// report" rather than "this broke".
+	const el = document.getElementById('diag');
+	el.textContent = 'popup error: ' + String(e && e.message || e);
+	el.classList.add('bad');
+});

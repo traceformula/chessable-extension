@@ -55,13 +55,39 @@ async function grantedOrigins() {
 	return (origins || []).filter(o => !BUILT_IN.includes(hostOf(o)));
 }
 
+// Ask the worker to (re)register and hand back what happened, so a site that was
+// granted but whose scripts failed to register is visibly different from one
+// that is working.
+async function syncNow() {
+	try { return await chrome.runtime.sendMessage({ type: 'kbm-sync' }); }
+	catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+}
+
+function problemWith(entry) {
+	if (!entry) return 'not registered';
+	const bad = ['page', 'probe'].filter(k => entry[k] !== 'ok');
+	if (!bad.length) return null;
+	return bad.map(k => entry[k] || 'not registered').join('; ');
+}
+
 async function render() {
 	const granted = await grantedOrigins();
+	const result = await syncNow();
+	const status = (result && result.status) || {};
+
 	siteList.textContent = '';
 	for (const origin of granted.sort()) {
 		const row = document.createElement('li');
 		const name = document.createElement('span');
+		const problem = problemWith(status[origin]);
 		name.textContent = hostOf(origin);
+		if (problem) {
+			name.title = problem;
+			const warn = document.createElement('small');
+			warn.textContent = ' — not working';
+			warn.style.color = '#c0504a';
+			name.appendChild(warn);
+		}
 		const remove = document.createElement('button');
 		remove.textContent = 'remove';
 		remove.addEventListener('click', async () => {
@@ -98,8 +124,15 @@ async function render() {
 	addButton.textContent = 'Enable on ' + url.hostname;
 	siteState.textContent = 'Adds link hints and scrolling. Chrome will ask you to confirm.';
 	addButton.onclick = async () => {
-		try { await chrome.permissions.request({ origins: [pattern] }); }
-		catch (e) { /* declined, or not a gesture */ }
+		let ok = false;
+		try { ok = await chrome.permissions.request({ origins: [pattern] }); }
+		catch (e) { ok = false; }
+		// Registration follows the grant, and the page needs reloading before
+		// scripts injected at document_start can run on it.
+		if (ok) {
+			await syncNow();
+			siteState.textContent = 'Enabled. Reload the page to start using it.';
+		}
 		render();
 	};
 }

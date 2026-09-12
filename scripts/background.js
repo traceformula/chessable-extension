@@ -40,27 +40,52 @@ async function sync() {
 	const existing = await chrome.scripting.getRegisteredContentScripts();
 	const ours = existing.filter(s => s.id.startsWith('kbm-')).map(s => s.id);
 	if (ours.length) await chrome.scripting.unregisterContentScripts({ ids: ours });
-	if (!extra.length) return;
 
-	await chrome.scripting.registerContentScripts(extra.flatMap(origin => [
-		{
-			id: idFor(origin, 'page'), matches: [origin], js: PAGE_JS,
-			runAt: 'document_start', allFrames: true, world: 'ISOLATED',
-			persistAcrossSessions: true,
-		},
-		{
+	// Registered one at a time, and the two worlds separately. A single call
+	// rejects as a whole, so one unsupported option would silently cost every
+	// site its scripts - which is exactly how this failed the first time.
+	const status = {};
+	for (const origin of extra) {
+		status[origin] = { page: null, probe: null };
+		try {
+			await chrome.scripting.registerContentScripts([{
+				id: idFor(origin, 'page'), matches: [origin], js: PAGE_JS,
+				runAt: 'document_start', allFrames: true, world: 'ISOLATED',
+				persistAcrossSessions: true,
+			}]);
+			status[origin].page = 'ok';
+		} catch (e) {
+			status[origin].page = String(e && e.message || e);
+		}
+		try {
 			// Must be the page's own world: it wraps addEventListener before the
 			// site's code runs, to catch handlers that leave no trace in markup.
-			id: idFor(origin, 'probe'), matches: [origin], js: PROBE_JS,
-			runAt: 'document_start', allFrames: true, world: 'MAIN',
-			persistAcrossSessions: true,
-		},
-	]));
+			await chrome.scripting.registerContentScripts([{
+				id: idFor(origin, 'probe'), matches: [origin], js: PROBE_JS,
+				runAt: 'document_start', allFrames: true, world: 'MAIN',
+				persistAcrossSessions: true,
+			}]);
+			status[origin].probe = 'ok';
+		} catch (e) {
+			status[origin].probe = String(e && e.message || e);
+		}
+	}
+	await chrome.storage.local.set({ registration: { at: Date.now(), status } });
+	return status;
 }
 
 function safeSync() {
 	sync().catch(e => console.warn('[kbm] could not sync content scripts:', e));
 }
+
+// The popup asks for this so a failure can be shown next to the site rather
+// than left in a service worker log nobody opens.
+chrome.runtime.onMessage.addListener((msg, sender, reply) => {
+	if (!msg || msg.type !== 'kbm-sync') return false;
+	sync().then(status => reply({ ok: true, status }))
+		.catch(e => reply({ ok: false, error: String(e && e.message || e) }));
+	return true;   // reply is async
+});
 
 chrome.runtime.onInstalled.addListener(safeSync);
 chrome.runtime.onStartup.addListener(safeSync);

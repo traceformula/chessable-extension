@@ -200,6 +200,11 @@ The click goes to a **point** rather than to an element: whatever
 hit, including anything layered on top. Matches inside same-origin frames are
 found too.
 
+Focus follows the click, as it would with a mouse — onto the nearest focusable
+ancestor, since the span holding the text usually is not focusable but the link
+around it is. When nothing above it can take focus, focus is dropped rather than
+left behind, so the page stops sending keys to a field you have visibly left.
+
 `'` still clicks whatever Chrome's own find left selected, which works on prose
 and not on controls. `/` is the one to reach for.
 

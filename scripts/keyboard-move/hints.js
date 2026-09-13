@@ -213,6 +213,37 @@
 		}
 	}
 
+	// Where a real click would leave the focus.
+	//
+	// Clicking focuses the nearest focusable thing, not necessarily what was under
+	// the pointer: the span inside a link is not focusable, the link is. tabIndex
+	// reports 0 for anything natively focusable and -1 otherwise, which is exactly
+	// the test needed. When nothing above is focusable, a real click still takes
+	// focus off whatever held it, so that is matched too - otherwise the page
+	// carries on sending keys to a field the user has visibly left.
+	function focusableAncestor(el) {
+		for (let n = el; n && n.nodeType === 1; n = n.parentElement) {
+			if (typeof n.tabIndex === 'number' && n.tabIndex >= 0) return n;
+		}
+		return null;
+	}
+
+	function giveFocus(el) {
+		const target = focusableAncestor(el);
+		if (target) {
+			try { target.focus({ preventScroll: true }); } catch (e) { /* refused */ }
+			return target;
+		}
+		const doc = el.ownerDocument;
+		const active = doc && doc.activeElement;
+		if (active && active !== doc.body && typeof active.blur === 'function') {
+			try { active.blur(); } catch (e) { /* refused */ }
+		}
+		return null;
+	}
+
+	ns.giveFocus = giveFocus;
+
 	function activate(el) {
 		// A field wants focus, not a click; anything else gets a real click so the
 		// page's own handler runs, whatever it is.
@@ -221,7 +252,10 @@
 			el.focus();
 			return;
 		}
-		try { el.focus({ preventScroll: true }); } catch (e) { /* not focusable */ }
+		// Before the events, because a real click focuses on mousedown - and a
+		// handler reading document.activeElement should see what a mouse would
+		// have left there.
+		giveFocus(el);
 		const r = el.getBoundingClientRect();
 		const at = { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
 		for (const type of ['mousedown', 'mouseup', 'click']) {

@@ -170,6 +170,9 @@
 			x - (m.doc === document ? 0 : 0), y);
 		if (!target) return false;
 		close();
+		// Match where a real click leaves the focus. Defined by the hint engine,
+		// which is loaded alongside this on every site it runs on.
+		if (ns.giveFocus) ns.giveFocus(target);
 		for (const type of ['mousedown', 'mouseup', 'click']) {
 			target.dispatchEvent(new MouseEvent(type, {
 				bubbles: true, cancelable: true, composed: true,

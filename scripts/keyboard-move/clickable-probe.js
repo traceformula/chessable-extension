@@ -2,51 +2,34 @@
 //
 // Some applications give nothing away in their markup. The xiangqi client is
 // compiled from Java: its table rows are bare divs with no href, no role, no
-// tabindex, and not even a pointer cursor - clickable only because a listener
-// was attached in code. Attaching that listener is itself observable.
+// tabindex, and not even a pointer cursor. What they do carry is a __listener
+// expando, because GWT dispatches centrally rather than binding per element.
+// Those are ordinary JavaScript properties, invisible from the extension's
+// world, so they have to be read from the page's own.
 //
-// Nothing here writes to the DOM while the page is running. An earlier version
-// tagged the element from inside addEventListener, which broke YouTube outright:
-// web components routinely call addEventListener in their constructor, and the
-// Custom Elements spec forbids setting an attribute there, so the upgrade failed
-// and the app never finished rendering. Elements are recorded in a WeakSet
-// instead, and turned into attributes only when hints ask - after construction,
-// briefly, and cleared again immediately.
+// Nothing is written to the DOM while the page runs. Attributes are materialised
+// only when hints ask, and cleared again immediately - an earlier version tagged
+// elements from inside addEventListener and broke YouTube, because web
+// components call addEventListener in their constructor and setting an attribute
+// there is forbidden.
+//
+// It no longer wraps addEventListener at all. Doing so put this file in the call
+// stack of every listener any page registered, which meant Chrome attributed the
+// page's own policy violations to the extension - YouTube Studio forbids unload
+// listeners, registers one anyway, and the report named this script. The
+// detection that hook added was marginal: anything with a real handler almost
+// always also has a pointer cursor, a role, or an expando, and those are read
+// below without touching a method every page depends on.
 (function () {
 	const ATTR = 'data-kbm-click';
-	const INTERESTING = new Set(['click', 'mousedown', 'mouseup', 'pointerdown']);
 	const MARKERS = ['__listener', '__eventBits', '__gwt_resolve'];
 
-	const proto = EventTarget && EventTarget.prototype;
-	if (!proto || !proto.addEventListener || proto.__kbmProbed) return;
-
-	const clickable = new WeakSet();
-	const original = proto.addEventListener;
-
-	proto.addEventListener = function (type, listener, options) {
-		try {
-			// Elements only. A listener on document or window is delegation, and
-			// counting those would make the whole page one target.
-			//
-			// Tested by nodeType rather than instanceof, which is bound to the realm
-			// it was evaluated in: an element belonging to an iframe is not an
-			// instance of its parent's Element, so a page wiring up handlers inside
-			// a frame - which is how Chessable drives its board - was being skipped.
-			if (INTERESTING.has(type) && this && this.nodeType === 1) clickable.add(this);
-		} catch (e) { /* never let bookkeeping break the page's own wiring */ }
-		return original.call(this, type, listener, options);
-	};
-
+	if (document.__kbmProbed) return;
 	try {
-		Object.defineProperty(proto, '__kbmProbed', { value: true, enumerable: false });
-	} catch (e) { /* sealed prototype: the wrapper is still in place */ }
+		Object.defineProperty(document, '__kbmProbed', { value: true, enumerable: false });
+	} catch (e) { /* listeners below are still registered once per injection */ }
 
-	// Frameworks that dispatch centrally never pass an element to
-	// addEventListener at all - GWT marks each widget with a __listener expando
-	// instead. Those are ordinary JavaScript properties, invisible from the
-	// extension's world, so they have to be read here.
 	function isClickable(el) {
-		if (clickable.has(el)) return true;
 		if (typeof el.onclick === 'function') return true;
 		for (const key of MARKERS) {
 			if (el[key] != null) return true;

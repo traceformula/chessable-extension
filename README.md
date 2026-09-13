@@ -154,12 +154,17 @@ nothing on the page can be clicked, it says so rather than doing nothing.
 
 Clickability is judged three ways, because some applications give nothing away
 in their markup. Declared markup — a link, a button, an ARIA role — is trusted
-first. Then a pointer cursor. Then the handler itself: `clickable-probe.js`
-runs in the page before the application does, wraps `addEventListener` to tag
-whatever registers a click, and sweeps for the expandos frameworks leave on
-their widgets when they dispatch centrally instead. GWT does exactly that, so
-the xiangqi table rows are clickable without a role, an href, a tabindex or
-even a pointer cursor.
+first. Then a pointer cursor. Then the handler itself: `clickable-probe.js` runs
+in the page's own world and reads what a framework leaves on its widgets — a
+DOM0 `onclick`, or the `__listener` expando GWT attaches because it dispatches
+centrally. That is how the xiangqi table rows are found, having no role, href,
+tabindex or pointer cursor at all.
+
+It deliberately does not wrap `addEventListener`. An earlier version did, which
+put this extension in the call stack of every listener any page registered — so
+Chrome attributed pages' own policy violations to it — and the detection it
+added was marginal, since anything with a real handler nearly always carries one
+of the other three signals too.
 
 Since a pointer cursor is inherited, a declared element always wins over the
 box drawn around it, so a link never fragments into separate hints for its icon

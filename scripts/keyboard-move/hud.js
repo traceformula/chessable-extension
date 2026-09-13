@@ -20,7 +20,7 @@
 .kbm-buf:after { content: "_"; opacity: .55; }
 .kbm-cands { display: flex; gap: 7px; opacity: .78; font-size: 13px; }
 .kbm-cands span { padding: 1px 5px; border-radius: 4px; background: rgba(255,255,255,.12); }
-.kbm-note { opacity: .7; font-size: 13px; }
+.kbm-note { opacity: .7; font-size: 13px; max-width: 60ch; white-space: normal; }
 .kbm-hud[data-open="1"][data-mode="help"] {
 	display: block; padding: 16px 19px 17px; border-radius: 11px;
 	max-width: min(94vw, 540px); line-height: 1.45;

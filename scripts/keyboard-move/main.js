@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.24.0';
+	ns.version = '1.24.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -326,8 +326,16 @@
 				if (e.key === 'Enter') {
 					e.preventDefault();
 					const used = site.activateAny(action.labels);
-					ns.hud.show('', { state: used ? 'unique' : 'none', candidates: [] },
-						used ? action.verb : 'no ' + action.verb + ' control found');
+					// Naming what is on screen when nothing matched: the labels are
+					// guesses at another program's wording, and a bare "not found"
+					// leaves no way to correct them.
+					let note = action.verb;
+					if (!used) {
+						const seen = site.labels ? site.labels(8) : [];
+						note = 'no ' + action.verb + ' control'
+							+ (seen.length ? ' \u2014 saw: ' + seen.join(', ') : '');
+					}
+					ns.hud.show('', { state: used ? 'unique' : 'none', candidates: [] }, note);
 					scheduleHide('message');
 					return;
 				}
@@ -365,8 +373,13 @@
 					e.preventDefault();
 					e.stopImmediatePropagation();
 					const ok = site.activate(label);
-					ns.hud.show('', { state: ok ? 'unique' : 'none', candidates: [] },
-						ok ? label : label + ' \u2014 not found');
+					let note = label;
+					if (!ok) {
+						const seen = site.labels ? site.labels(8) : [];
+						note = label + ' \u2014 not found'
+							+ (seen.length ? '; saw: ' + seen.join(', ') : '');
+					}
+					ns.hud.show('', { state: ok ? 'unique' : 'none', candidates: [] }, note);
 					scheduleHide('message');
 					return;
 				}

@@ -144,18 +144,45 @@
 		return labelled(NAV_LABEL[which], scope);
 	}
 
-	// Lobby controls, driven the same way: by the text drawn on them. Matching is
-	// exact once trimmed, so "tables" does not also hit "new tables".
-	function control(label) {
-		const wanted = label.toLowerCase();
+	// Everything that looks like a control: a leaf element, drawn, with a short
+	// label on it. The client is compiled from Java and its buttons are plain
+	// divs, so there is nothing better to go on than the text.
+	function candidates() {
+		const out = [];
 		for (const el of document.querySelectorAll('button, a, div, span, td, th')) {
 			if (el.children.length) continue;
-			if ((el.textContent || '').trim().toLowerCase() !== wanted) continue;
+			const text = (el.textContent || '').trim();
+			if (!text || text.length > 24) continue;
 			const r = el.getBoundingClientRect();
 			if (r.width < 8 || r.height < 8) continue;
-			return el;
+			if (r.bottom < 0 || r.top > innerHeight) continue;
+			out.push({ el, text });
 		}
+		return out;
+	}
+
+	// Exact match first, then case-insensitive, then a whole-word match inside a
+	// longer label - "Unsit" should still be found on a button reading "Unsit
+	// table". Anything looser would start matching prose.
+	function control(label) {
+		const list = candidates();
+		const wanted = label.toLowerCase();
+		for (const c of list) if (c.text === label) return c.el;
+		for (const c of list) if (c.text.toLowerCase() === wanted) return c.el;
+		const word = new RegExp('(^|\\W)' + wanted.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '($|\\W)', 'i');
+		for (const c of list) if (word.test(c.text)) return c.el;
 		return null;
+	}
+
+	// What is actually on screen, so a name that does not match can be corrected
+	// rather than guessed at again.
+	function controlLabels(limit) {
+		const seen = new Set();
+		for (const c of candidates()) {
+			if (!seen.has(c.text)) seen.add(c.text);
+			if (seen.size >= (limit || 10)) break;
+		}
+		return [...seen];
 	}
 
 	function chatInput() {
@@ -262,6 +289,8 @@
 			}
 			return null;
 		},
+
+		labels(limit) { return controlLabels(limit); },
 
 		focusChat() {
 			const el = chatInput();

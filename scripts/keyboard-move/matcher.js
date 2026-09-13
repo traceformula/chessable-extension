@@ -57,6 +57,11 @@
 			const uci = canon(move.from + move.to);
 			out.add(uci);
 			if (move.promotion) out.add(uci + canon(move.promotion));
+			// "b6xc5" for a capture, matching the x that SAN and the piece forms
+			// above both accept. Pawns get no shorter origin hint than this: unlike
+			// a piece move, dropping the rank from "exd5" would leave "d5", which is
+			// a different, legal pawn push.
+			if (c.includes('x')) out.add(canon(move.from) + 'x' + canon(move.to));
 		}
 		return [...out];
 	}
@@ -94,11 +99,20 @@
 
 		let candidates = moves.filter(m => forms(m).some(f => f.startsWith(buf)));
 
-		// An uppercase leading piece letter is an explicit signal: "Bc4" means the
-		// bishop, never the b-pawn. Only narrow when it actually resolves something.
+		// Case is the one thing notation already uses to tell these apart, and b is
+		// the only letter that is both a piece and a file. "Bxc5" is the bishop,
+		// "bxc5" the b-pawn - but canon() has lowercased by here, so both arrive as
+		// the same string and neither could be reached without this.
+		//
+		// Either way it only narrows when something is left, so typing lowercase
+		// for a piece still works wherever there is no pawn move to confuse it
+		// with: "bb5" finds Bb5, because no pawn move is spelled that way.
 		const lead = raw[0];
 		if (PIECES.includes(lead)) {
 			const narrowed = candidates.filter(m => (m.san || '')[0] === lead);
+			if (narrowed.length) candidates = narrowed;
+		} else if (/^[a-h]$/.test(lead)) {
+			const narrowed = candidates.filter(m => /^[a-h]/.test(m.san || ''));
 			if (narrowed.length) candidates = narrowed;
 		}
 

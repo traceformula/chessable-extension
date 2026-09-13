@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.25.0';
+	ns.version = '1.26.0';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -464,6 +464,7 @@
 					[['oo', 'ooo'], 'castle short or long'],
 					[['e8', 'e8n'], 'promote to a queen, or name the piece'],
 					['R8xg6', 'any disambiguator that names the origin'],
+					[['Bc5', 'bc5'], 'capital B is the bishop, small b the pawn'],
 					['enter', 'play the move shown'],
 					[['backspace', 'esc'], 'correct, or clear'],
 				] },

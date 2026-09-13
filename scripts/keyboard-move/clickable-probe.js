@@ -27,7 +27,12 @@
 		try {
 			// Elements only. A listener on document or window is delegation, and
 			// counting those would make the whole page one target.
-			if (INTERESTING.has(type) && this instanceof Element) clickable.add(this);
+			//
+			// Tested by nodeType rather than instanceof, which is bound to the realm
+			// it was evaluated in: an element belonging to an iframe is not an
+			// instance of its parent's Element, so a page wiring up handlers inside
+			// a frame - which is how Chessable drives its board - was being skipped.
+			if (INTERESTING.has(type) && this && this.nodeType === 1) clickable.add(this);
 		} catch (e) { /* never let bookkeeping break the page's own wiring */ }
 		return original.call(this, type, listener, options);
 	};

@@ -46,12 +46,15 @@ Input is forgiving:
 | --- | --- | --- |
 | chess.com | notation | games, puzzles, analysis; premoves available |
 | Chessable | notation | explore boards |
-| lichess | notation | analysis and study boards only — see below |
+| lichess | notation | games, analysis and study boards |
 | clubxiangqi | two squares | xiangqi; lobby and table shortcuts too |
 
-On a lichess **game** page the board reports itself unplayable rather than
-dropping moves silently: lichess exposes no controller there, and its own
-keyboard-move box does not respond to anything synthetic.
+On a lichess **game** page there is no controller to call and chessground
+refuses synthetic events, so the move is handed to lichess's own WebSocket as
+the frame the page itself would have sent. The server answers to the socket, so
+the move comes back down the wire and lichess puts it on the board. Only a board
+you are actually sitting at can be moved on; spectating opens a different socket
+and is ignored.
 
 ### Keys
 

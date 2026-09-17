@@ -1,23 +1,31 @@
 // lichess adapter.
 //
-// Analysis and study boards expose their controller as site.analysis, which is
-// what makes them straightforward: userMove(orig, dest) is the same entry point
-// a drag reaches. Game pages expose no controller at all - site.round does not
-// exist and nothing is attached to the DOM - and chessground refuses synthetic
-// mouse events, so the only way in there is lichess's own keyboard-move box.
-// That has to be switched on in lichess preferences; without it, a game board
-// reports itself unplayable rather than pretending.
+// Two completely different boards live behind one hostname.
 //
-// The keyboard-move transport is UNVERIFIED. Driving that box with synthetic
-// events on an analysis board did nothing, through four different combinations:
-// setting value then Enter as keydown, as keypress, as keyup, and typing
-// character by character with a full event set each. Synthetic mouse events on
-// chessground are refused the same way. The likeliest explanation is an
-// isTrusted check, which is what chessground does for drags - but that could not
-// be confirmed, since redefining Event.prototype.isTrusted had no effect from
-// the console either. A real content script at document_start may fare better.
-// Until someone tries it in a game, expect analysis boards to work and game
-// boards to report the move as not accepted.
+// Analysis and study boards expose their controller as site.analysis, so
+// userMove(orig, dest) reaches the same entry point a drag does. Easy.
+//
+// Game boards expose nothing: no site.round, no controller on the DOM, and
+// chessground refuses synthetic mouse events. Every DOM-level route was tried
+// and refused. But the page still has to tell the server about the move, and it
+// does that over a WebSocket - so that is where we join in. Wrapping the
+// constructor at document_start, before lichess opens it, gives us the same
+// socket the page uses, and a move is the frame lichess itself sends:
+//
+//     {"t":"move","d":{"u":"e2e4"}}
+//
+// The server answers to the socket, not to whoever called it, so the move comes
+// back down the wire and lichess's own code applies it to the board. Nothing is
+// faked and nothing is driven through the UI.
+//
+// Only a /play/ socket is a game we are sitting at - spectating opens /watch/ -
+// so a board we are merely watching can never be moved on.
+//
+// Position comes off the DOM, since no controller will tell us: chessground
+// places pieces on an eighth-of-the-board grid, and .cg-wrap carries the
+// orientation. Whose turn it is comes from the running clock, and which side we
+// are from the player box carrying our own username - read that way rather than
+// from the orientation so that flipping the board cannot mislead it.
 (function () {
 	const ns = (globalThis.__KBM = globalThis.__KBM || {});
 
@@ -25,25 +33,160 @@
 		try { return fn(); } catch (e) { return fallback; }
 	}
 
+	const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+	// ---------------------------------------------------------------- sockets
+
+	const sockets = [];
+	let lastUci = null;
+	let lastPly = null;
+
+	function onFrame(ev) {
+		const msg = safe(() => JSON.parse(ev.data), null);   // pings are not JSON
+		if (!msg || msg.t !== 'move' || !msg.d) return;
+		if (msg.d.uci) lastUci = msg.d.uci;
+		if (typeof msg.d.ply === 'number') lastPly = msg.d.ply;
+	}
+
+	// Transparent: a Proxy keeps instanceof, the static constants and the
+	// prototype intact, so lichess cannot tell the difference.
+	function hookSockets() {
+		const Original = safe(() => window.WebSocket, null);
+		if (!Original || Original.__kbmHooked) return;
+		const wrapped = new Proxy(Original, {
+			construct(target, args) {
+				const ws = Reflect.construct(target, args);
+				safe(() => {
+					if (/\/play\//.test(new URL(ws.url).pathname)) {
+						sockets.push(ws);
+						ws.addEventListener('message', onFrame);
+					}
+				});
+				return ws;
+			},
+		});
+		safe(() => { Original.__kbmHooked = true; });
+		safe(() => { window.WebSocket = wrapped; });
+	}
+	hookSockets();
+
+	function playSocket() {
+		for (let i = sockets.length - 1; i >= 0; i--) {
+			if (sockets[i].readyState === 1) return sockets[i];   // OPEN
+		}
+		return null;
+	}
+
+	// ------------------------------------------------------------ the boards
+
 	function analysis() {
 		return safe(() => window.site && window.site.analysis, null);
 	}
 
 	function ground() {
 		const an = analysis();
-		if (an && an.chessground) return an.chessground;
+		return an && an.chessground ? an.chessground : null;
+	}
+
+	function mode() {
+		if (analysis()) return 'analysis';
+		if (document.querySelector('.round__app')) return 'round';
 		return null;
 	}
 
-	function keyboardBox() {
-		const el = document.querySelector('.keyboard-move input');
-		return el && !el.disabled ? el : null;
+	const ROLES = {
+		pawn: 'p', knight: 'n', bishop: 'b', rook: 'r', queen: 'q', king: 'k',
+	};
+
+	// Placement read off the rendered pieces. Pieces mid-animation carry
+	// fractional offsets, which round to the square they are heading for, and
+	// the dragged and captured copies are skipped so they cannot double up.
+	function domPlacement() {
+		// Chessground rebuilds these on a flip, and a measurement taken during
+		// that reports zero - which would put every piece on the same square. Ask
+		// each of them and take the first that answers with a real width.
+		let size = 0;
+		for (const sel of ['cg-board', 'cg-container', '.cg-wrap']) {
+			for (const el of document.querySelectorAll(sel)) {
+				size = el.getBoundingClientRect().width;
+				if (size) break;
+			}
+			if (size) break;
+		}
+		if (!size) return null;
+		const unit = size / 8;
+		const flipped = !!document.querySelector('.cg-wrap.orientation-black');
+
+		const grid = Array.from({ length: 8 }, () => Array(8).fill(null));
+		for (const piece of document.querySelectorAll('cg-board piece')) {
+			if (piece.classList.contains('ghost') || piece.classList.contains('fading')) continue;
+			const at = /translate\(\s*([-\d.]+)px[,\s]+([-\d.]+)px/
+				.exec(piece.getAttribute('style') || '');
+			if (!at) continue;
+			const col = Math.round(Number(at[1]) / unit);
+			const row = Math.round(Number(at[2]) / unit);
+			if (col < 0 || col > 7 || row < 0 || row > 7) continue;
+
+			const names = String(piece.className).split(/\s+/);
+			const role = names.find(n => ROLES[n]);
+			if (!role) continue;
+			const white = names.includes('white');
+			const file = flipped ? 7 - col : col;
+			const rank = flipped ? row : 7 - row;          // 0 is rank 1
+			grid[rank][file] = white ? ROLES[role].toUpperCase() : ROLES[role];
+		}
+
+		const rows = [];
+		for (let rank = 7; rank >= 0; rank--) {
+			let row = '', gap = 0;
+			for (let file = 0; file < 8; file++) {
+				const piece = grid[rank][file];
+				if (piece) { if (gap) { row += gap; gap = 0; } row += piece; }
+				else gap++;
+			}
+			if (gap) row += gap;
+			rows.push(row);
+		}
+		return rows.join('/');
 	}
 
-	// Castling rights are not in chessground's placement-only FEN, so they are
-	// deduced from where the kings and rooks stand. Wrong only in the case where
-	// a piece has returned to its home square after moving, and the dests filter
-	// below removes any castle that is not actually available.
+	const START_PLACEMENT = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR';
+
+	// Three sources, best first. The clock is the plain answer while one is
+	// ticking, but it is not always: a correspondence game has none, and neither
+	// side's clock runs before the opening move. The server numbers every move
+	// it sends, and that parity is just as good - ply 1 is white's first move,
+	// so an odd count leaves black to play. Failing both, an untouched board can
+	// only be white to move.
+	function domTurn() {
+		const running = document.querySelector('.rclock.running');
+		if (running) return running.classList.contains('rclock-white') ? 'w' : 'b';
+		if (lastPly !== null) return lastPly % 2 ? 'b' : 'w';
+		if (domPlacement() === START_PLACEMENT) return 'w';
+		return null;
+	}
+
+	// Which side we are sitting at. The player boxes and the clocks move
+	// together when the board is flipped, so pairing them by position holds.
+	function myColour() {
+		const tag = document.querySelector('#user_tag');
+		const me = tag ? tag.textContent.trim().toLowerCase() : '';
+		if (me) {
+			for (const side of ['bottom', 'top']) {
+				const box = document.querySelector('.ruser-' + side);
+				const clock = document.querySelector('.rclock-' + side);
+				if (box && clock && box.textContent.toLowerCase().includes(me)) {
+					return clock.classList.contains('rclock-white') ? 'w' : 'b';
+				}
+			}
+		}
+		return document.querySelector('.cg-wrap.orientation-black') ? 'b' : 'w';
+	}
+
+	// Castling rights are not in a placement-only FEN, so they are deduced from
+	// where the kings and rooks stand. Wrong only after a piece has returned to
+	// its home square, and then the server simply ignores the move rather than
+	// playing a different one.
 	function castling(placement) {
 		const rows = placement.split('/');
 		const expand = r => r.replace(/\d/g, d => '.'.repeat(Number(d)));
@@ -56,9 +199,30 @@
 		return out || '-';
 	}
 
-	function fullFen() {
-		// Analysis boards publish the real thing, including halfmove counters.
-		const shown = safe(() => document.querySelector('.copyables .fen input, input.copyable'), null);
+	// The one right the placement cannot show. Taken from the move the server
+	// last sent us: a pawn that has just crossed two ranks can be taken past.
+	function enPassant(placement) {
+		if (!lastUci || lastUci.length < 4) return '-';
+		const from = lastUci.slice(0, 2), to = lastUci.slice(2, 4);
+		if (from[0] !== to[0]) return '-';
+		const fromRank = Number(from[1]), toRank = Number(to[1]);
+		if (Math.abs(fromRank - toRank) !== 2) return '-';
+
+		const rows = placement.split('/').map(r => r.replace(/\d/g, d => '.'.repeat(Number(d))));
+		const landed = rows[8 - toRank] && rows[8 - toRank][from.charCodeAt(0) - 97];
+		if (!landed || landed.toLowerCase() !== 'p') return '-';
+		return from[0] + ((fromRank + toRank) / 2);
+	}
+
+	function roundFen() {
+		const placement = domPlacement();
+		const turn = domTurn();
+		if (!placement || !turn) return null;
+		return [placement, turn, castling(placement), enPassant(placement), 0, 1].join(' ');
+	}
+
+	function analysisFen() {
+		const shown = document.querySelector('.copyables .fen input, input.copyable');
 		if (shown && shown.value && shown.value.split(' ').length >= 4) return shown.value;
 
 		const cg = ground();
@@ -69,27 +233,31 @@
 		return placement + ' ' + turn + ' ' + castling(placement) + ' - 0 1';
 	}
 
-	let cache = { fen: null, dests: null, moves: [] };
+	function fullFen() {
+		return mode() === 'round' ? roundFen() : analysisFen();
+	}
+
+	let cache = { key: null, moves: [] };
 
 	ns.lichess = {
 		name: 'lichess',
 		supportsPremove: false,
 
 		isReady() {
-			return !!ground() && !!ns.Chess;
+			return !!mode() && !!ns.Chess;
 		},
 
-		// Generated locally for the SAN, then filtered against chessground's own
-		// dests, which is lichess's legality rather than ours. That combination
-		// covers the deduced castling rights being wrong.
+		// Generated locally for the SAN. On analysis boards chessground's own
+		// dests then filter it, which is lichess's legality rather than ours; a
+		// game board has no dests to consult, and an illegal move is refused by
+		// the server rather than turning into a different one.
 		legalMoves() {
-			const cg = ground();
-			if (!cg) return [];
 			const fen = fullFen();
 			if (!fen) return [];
-			const dests = safe(() => cg.state.movable.dests, null);
+			const cg = ground();
+			const dests = cg ? safe(() => cg.state.movable.dests, null) : null;
 			const key = fen + '|' + (dests ? dests.size : 0);
-			if (cache.fen === key) return cache.moves;
+			if (cache.key === key) return cache.moves;
 
 			let moves = [];
 			try {
@@ -102,21 +270,25 @@
 			if (dests && dests.size) {
 				moves = moves.filter(m => (dests.get(m.from) || []).includes(m.to));
 			}
-			cache = { fen: key, dests, moves };
+			cache = { key, moves };
 			return moves;
 		},
 
 		status() {
+			const where = mode();
+			if (!where) return { playable: false, reason: 'no board' };
+
+			if (where === 'round') {
+				if (!playSocket()) return { playable: false, reason: 'not your game' };
+				const turn = domTurn();
+				if (!turn) return { playable: false, reason: 'no clock running' };
+				if (turn !== myColour()) return { playable: false, reason: 'not your turn' };
+				return { playable: true, reason: null };
+			}
+
 			const cg = ground();
 			if (!cg) return { playable: false, reason: 'no board' };
 			if (safe(() => cg.state.viewOnly, false)) return { playable: false, reason: 'observing' };
-
-			// A game board with no controller and no keyboard box cannot be played
-			// by anything we have.
-			if (!analysis() && !keyboardBox()) {
-				return { playable: false, reason: 'enable keyboard input in lichess preferences' };
-			}
-
 			const movable = safe(() => cg.state.movable.color, null);
 			if (!movable || movable === 'both') return { playable: true, reason: null };
 			const turn = safe(() => cg.state.turnColor, null);
@@ -127,31 +299,28 @@
 		isMyTurn() { return this.status().playable; },
 
 		async play(move) {
-			const cg = ground();
-			if (!cg) return false;
-			const before = safe(() => cg.getFen(), null);
+			const uci = move.from + move.to + (move.promotion || '');
 
-			const an = analysis();
-			if (an && typeof an.userMove === 'function') {
-				safe(() => an.userMove(move.from, move.to, move.promotion));
-			} else {
-				const box = keyboardBox();
-				if (!box) return false;
-				// Hand lichess the move in its own input, in UCI so there is nothing
-				// to disambiguate, and submit the way a player would.
-				const setter = Object.getOwnPropertyDescriptor(
-					window.HTMLInputElement.prototype, 'value').set;
-				setter.call(box, move.from + move.to + (move.promotion || ''));
-				box.dispatchEvent(new Event('input', { bubbles: true }));
-				for (const type of ['keydown', 'keyup']) {
-					box.dispatchEvent(new KeyboardEvent(type, {
-						key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
-						bubbles: true, cancelable: true,
-					}));
+			if (mode() === 'round') {
+				const ws = playSocket();
+				if (!ws) return false;
+				const before = domPlacement();
+				safe(() => ws.send(JSON.stringify({ t: 'move', d: { u: uci } })));
+				// The move is only real once the server has sent it back and
+				// lichess has put it on the board.
+				for (let i = 0; i < 15; i++) {
+					await sleep(60);
+					if (domPlacement() !== before) return true;
 				}
+				return false;
 			}
 
-			await new Promise(r => setTimeout(r, 120));
+			const cg = ground();
+			const an = analysis();
+			if (!cg || !an || typeof an.userMove !== 'function') return false;
+			const before = safe(() => cg.getFen(), null);
+			safe(() => an.userMove(move.from, move.to, move.promotion));
+			await sleep(120);
 			return safe(() => cg.getFen(), null) !== before;
 		},
 

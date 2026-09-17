@@ -21,63 +21,85 @@ corrupted by playing moves for both colours.
 
 Both need one clean game against a real opponent.
 
-## lichess: analysis works, games do not
+## lichess: both board types work
 
-The adapter exists as of v1.16.0. Analysis and study boards are fully working.
-Game pages are not, and it is not obvious that they can be.
+The adapter exists as of v1.16.0; game pages joined it in v1.27.0. The two
+board types share almost nothing, so the adapter picks a mode and routes.
 
-Moves are generated locally from the FEN and then filtered against
-chessground's own `state.movable.dests`, which is lichess's legality rather
-than ours - that covers castling rights being deduced wrongly when no full FEN
-is published. Verified against a live board: 33 generated, 33 surviving the
-filter, `O-O` kept even though lichess encodes castling as `e1->h1` as well as
-`e1->g1`.
+**Analysis and study boards.** `site.analysis` exposes the controller:
+`userMove(orig, dest)` plays, `chessground.getFen()` gives placement (not a
+full FEN), `chessground.state.movable.dests` gives legal destinations without
+SAN, and the full FEN is in the `.copyables .fen input` field. Moves are
+generated locally from the FEN and then filtered against those dests, which is
+lichess's legality rather than ours - that covers castling rights being deduced
+wrongly when no full FEN is published. Verified against a live board: 33
+generated, 33 surviving the filter, `O-O` kept even though lichess encodes
+castling as `e1->h1` as well as `e1->g1`.
 
-**The game-page transport is unsolved.** Four ways of driving lichess's own
-keyboard-move box were tried on an analysis board and none moved a piece:
-setting `value` then Enter as keydown, as keypress, as keyup, and typing
-character by character with a full event set per character. Synthetic mouse
-events on chessground are refused the same way. The likeliest explanation is an
-`isTrusted` check - chessground definitely does this for drags - but it could
-not be confirmed, because redefining `Event.prototype.isTrusted` from the
-console had no effect either.
+**Game pages expose nothing at all.** No `site.round`, no `site.socket`, no
+expando on `cg-board` or `.round__app`, nothing left attached by snabbdom -
+re-confirmed on a live round page. Synthetic mouse and pointer events are
+refused by chessground, and so is its own keyboard-move box; four ways of
+driving that box were tried and none moved a piece. The likeliest explanation
+is an `isTrusted` check, never confirmed.
 
-Worth trying next, in order: the `isTrusted` override from a real MAIN-world
-content script at `document_start`, where it persists and may behave
-differently from a console context; then `chrome.debugger`, which produces
-genuinely trusted events at the cost of a permanent "Chrome is being debugged"
-banner.
+So the DOM was the wrong place to look. The page has to tell the *server* about
+the move, and it does that over a WebSocket. Wrapping the constructor in a Proxy
+at `document_start` - before lichess opens it - hands us the very socket the
+page uses, and the move is the frame lichess itself sends:
 
-What the original de-risk established:
+    {"t":"move","d":{"u":"e2e4"}}
 
-- **Analysis boards are solved.** `site.analysis` exposes the controller:
-  `userMove(orig, dest)` plays, `chessground.getFen()` gives placement (not a
-  full FEN), `chessground.state.movable.dests` gives legal destinations without
-  SAN, and the full FEN is in the `.copyables .fen input` field.
-- **Game pages expose nothing.** `site.round` does not exist; there are no
-  expando properties on `cg-board` or `.round__app` leading to the controller,
-  and snabbdom leaves nothing attached.
-- **Synthetic events do not work.** Neither MouseEvent nor PointerEvent
-  sequences moved a piece, though `cg.getKeyAtDomPos()` confirmed the square
-  geometry was being computed correctly. An `Event.prototype.isTrusted` override
-  was attempted but did not persist between tool calls, so it is untested rather
-  than disproven — worth retrying from a content script at `document_start`,
-  where it would persist.
+The server replies to the socket rather than to whoever called it, so the move
+arrives back down the wire and lichess's own code puts it on the board. Nothing
+is faked and nothing is driven through the UI. This is the same path a move from
+another device takes.
 
-Three candidate transports for game pages, in the order worth trying:
+Read out of the deployed round bundle: `sendMove` -> `actualSendMove`, payload
+`{u: orig + dest}`, message types `move` and `drop`, sent with `ackable`. We
+omit the ack id: it only drives lichess's own resend timer, and a move that goes
+missing is reported as not accepted rather than silently retried.
 
-1. **Drive lichess's own keyboard input.** It has a native move-input box
-   (Preferences → Game behaviour → "Input moves with the keyboard"). Capture keys
-   ourselves, write the resolved move into `.keyboard-move input`. Most likely to
-   just work; their box becomes the transport.
-2. **Test the `isTrusted` override properly**, from a `document_start` content
-   script. If it holds, synthetic events work and both sites share one path.
-3. **`chrome.debugger`** for genuinely trusted events. Certain to work, but shows
-   a persistent "Chrome is being debugged" banner. Last resort.
+Only a `/play/` socket is a game we are sitting at - spectating opens
+`/watch/<id>/<colour>/v6` - so a board we are merely watching can never be moved
+on. Verified with a Proxy over a dead localhost port: `/play/` captured,
+`/watch/` ignored, and `instanceof`, the static constants, `.prototype`,
+`.name` and `.url` all still intact through the wrapper.
 
-Note lichess's native input will fight ours if left enabled: `Enter` steals
-focus into their box. Detect `.keyboard-move` and either stand down or tell the
-user to turn their preference off.
+Position has to come off the DOM, since no controller will tell us:
+
+- **Placement** from the rendered `<piece>` elements. Chessground lays them out
+  on an eighth-of-the-board grid via `transform: translate(Xpx, Ypx)`, and
+  `.cg-wrap` carries the orientation. Verified against `chessground.getFen()` on
+  an analysis board, in both orientations, exact match. Pieces marked `.ghost`
+  (being dragged) and `.fading` (just captured) are skipped so they cannot
+  double up, and mid-animation offsets round to the square being travelled to.
+- **Board size** is asked of `cg-board`, then `cg-container`, then `.cg-wrap`,
+  taking the first non-zero answer. A flip rebuilds these, and a measurement
+  taken during one reports zero - which would put every piece on one square.
+- **Turn** from the running clock, then the `ply` on the last move frame (odd
+  leaves black to play), then white if the board is untouched. The clock alone
+  is not enough: correspondence games have none, and neither clock runs before
+  the opening move.
+- **Which side we are** from the `.ruser` box carrying our own username, paired
+  with the `.rclock` on the same side. Read that way rather than from the
+  orientation, which the player can flip.
+- **Castling** is deduced from where kings and rooks stand, as on analysis
+  boards, but with no dests to filter against. A wrong guess is safe here: the
+  server ignores an illegal move, our verify step sees the board unchanged, and
+  it is reported as not accepted rather than becoming some other move.
+- **En passant** from the `uci` of the last move frame, when a pawn has just
+  crossed two ranks. Unavailable until a move arrives, so joining mid-game
+  misses one capture at most.
+
+Every move is confirmed by watching the placement actually change, so a refused
+move reports itself instead of appearing to have worked.
+
+**Still unverified:** the server accepting our frame. The protocol was read out
+of lichess's own bundle rather than observed being sent, because observing it
+means playing a real game on the user's account. Everything around it - the
+capture, the transparency of the wrapper, the position reading in both
+orientations - is verified.
 
 ## Match patterns
 

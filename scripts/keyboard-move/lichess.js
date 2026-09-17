@@ -158,6 +158,15 @@
 	// it sends, and that parity is just as good - ply 1 is white's first move,
 	// so an odd count leaves black to play. Failing both, an untouched board can
 	// only be white to move.
+	// lichess writes the result into the move list the moment a game ends, on the
+	// round page as well as the analysis one.
+	function gameOver() {
+		for (const el of document.querySelectorAll('.result-wrap .status, .status, .result')) {
+			if (el.textContent && el.textContent.trim()) return true;
+		}
+		return false;
+	}
+
 	function domTurn() {
 		const running = document.querySelector('.rclock.running');
 		if (running) return running.classList.contains('rclock-white') ? 'w' : 'b';
@@ -279,6 +288,10 @@
 			if (!where) return { playable: false, reason: 'no board' };
 
 			if (where === 'round') {
+				// A finished game still looks playable from the outside: the socket
+				// stays open a while and the ply count still names a side to move.
+				// Saying so would fire a move at a game the server has closed.
+				if (gameOver()) return { playable: false, reason: 'game over - open the analysis board' };
 				if (!playSocket()) return { playable: false, reason: 'not your game' };
 				const turn = domTurn();
 				if (!turn) return { playable: false, reason: 'no clock running' };

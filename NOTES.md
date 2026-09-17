@@ -95,6 +95,18 @@ Position has to come off the DOM, since no controller will tell us:
 Every move is confirmed by watching the placement actually change, so a refused
 move reports itself instead of appearing to have worked.
 
+A finished game still looks playable from the outside - the socket stays open
+for a while and the ply count still names a side to move - so the result in
+the move list is checked first. Verified both ways: no marker at all on a live
+round page, present on a finished game.
+
+Post-game viewing is two different pages. Once a game is over, every public
+URL shape for it (/id, /id/white, /id/black) serves the *analysis* app, which
+works fully - typing a move there was driven end to end. The player URL you
+are left on straight after your own game keeps the round app, where there is
+no controller to play variations against; that now says so and points at the
+analysis board.
+
 **Still unverified:** the server accepting our frame. The protocol was read out
 of lichess's own bundle rather than observed being sent, because observing it
 means playing a real game on the user's account. Everything around it - the

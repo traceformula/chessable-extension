@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.27.1';
+	ns.version = '1.27.2';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 

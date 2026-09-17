@@ -57,7 +57,11 @@
 			construct(target, args) {
 				const ws = Reflect.construct(target, args);
 				safe(() => {
-					if (/\/play\//.test(new URL(ws.url).pathname)) {
+					// Host as well as path. Matching the path alone would let any
+					// script already on the page open a socket of its own ending in
+					// /play/ and collect the next move we send.
+					const at = new URL(ws.url);
+					if (/(^|\.)lichess\.org$/.test(at.hostname) && /\/play\//.test(at.pathname)) {
 						sockets.push(ws);
 						ws.addEventListener('message', onFrame);
 					}

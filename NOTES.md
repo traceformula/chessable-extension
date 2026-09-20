@@ -197,6 +197,28 @@ with an id and text, and both mounted turns matched their rendered element by
 sits. There is no seeking to an unmounted one: nothing in the page says where it
 would go, unlike claude.ai's numbered rows.
 
+**Seeking to an unmounted row needs two things, and does nothing without
+either.** Both were found by watching a real conversation rather than reasoning
+about it, and the first attempt at this shipped broken.
+
+1. *Moving `scrollTop` does not tell the virtualizer anything.* It renders from
+   its own scroll handler, and an assignment does not run it. Measured: after a
+   real wheel scroll the mounted rows were 31-39; setting `scrollTop` to a
+   different position left them at 31-39; dispatching `new Event('scroll')` on
+   the scroller then rendered 14-23, matching the new position. So the event is
+   dispatched by hand after every move.
+2. *The correction must be measured from the row on screen.* The last few rows
+   of a conversation stay mounted wherever you are - 73, 74 and 75 were present
+   at every scroll position - so the lowest and highest mounted indices span
+   almost the whole transcript. The first version took min and max of the
+   mounted set, concluded the target was already in range, and sat still through
+   all twelve attempts without moving. Taking the mounted row nearest the middle
+   of the viewport fixes it.
+
+With both, a proportional first guess corrected once by the row in view found
+rows 4, 40, 55 and 68 of 76 on the **first attempt**, about a second each. Row
+68 is the 35th user turn, the one reported as not loading.
+
 **A warning about measuring any of this from automation.** The tab driving these
 experiments reported `visibilityState: "hidden"` and `requestAnimationFrame`
 never fired, so nothing repainted. Under those conditions the virtualizer cannot

@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.31.0';
+	ns.version = '1.31.1';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -142,40 +142,57 @@
 		return document.querySelector('[data-message-id="' + id + '"]');
 	}
 
-	// Walk to a row that is not in the page yet. The virtualizer renders what is
-	// near the scroll position, so each guess is corrected by the indices that
-	// came back - a handful of jumps rather than a walk through the transcript,
-	// which is far too expensive to repaint.
-	async function seek(row) {
+	// Which mounted row is actually in front of the viewport.
+	//
+	// Not the lowest or highest index mounted: the last few rows of a
+	// conversation stay mounted wherever you are, so min and max together span
+	// almost the whole transcript and would say we are already where we want to
+	// be. What is on screen is the only honest answer to "where am I".
+	function rowInView(sc) {
+		const middle = sc.getBoundingClientRect().top + sc.clientHeight / 2;
+		let best = null, bestDistance = Infinity;
+		for (const row of rowEls()) {
+			const box = row.getBoundingClientRect();
+			const distance = Math.abs((box.top + box.bottom) / 2 - middle);
+			if (distance < bestDistance) { bestDistance = distance; best = row; }
+		}
+		return best ? Number(best.dataset.index) : null;
+	}
+
+	// Bring a row that is not in the page into it.
+	//
+	// Two things make this work, and it does nothing without either. Moving
+	// scrollTop does not tell the virtualizer anything - it renders from its own
+	// scroll handler, and an assignment does not run it - so the event is
+	// dispatched by hand afterwards. And the correction is measured from the row
+	// actually on screen, then applied as a proportion of the average row
+	// height, which lands on the first attempt in practice.
+	async function seek(row, total) {
 		const sc = scroller();
 		if (!sc || !site.row) return null;
 		const exact = () => document.querySelector(site.row + '[data-index="' + row + '"]');
 
 		let hit = exact();
-		const total = Math.max(domTotal(), 1);
-		for (let attempt = 0; !hit && attempt < 10; attempt++) {
-			const rendered = rowEls().map(r => Number(r.dataset.index)).filter(v => !isNaN(v));
-			const perRow = Math.max(1, sc.scrollHeight / total);
-			let target;
-			if (!rendered.length) {
-				target = (row / total) * (sc.scrollHeight - sc.clientHeight);
-			} else {
-				const low = Math.min.apply(null, rendered);
-				const high = Math.max.apply(null, rendered);
-				if (row < low) target = sc.scrollTop - (low - row) * perRow;
-				else if (row > high) target = sc.scrollTop + (row - high) * perRow;
-				else break;
-			}
+		if (hit) return hit;
+
+		const count = Math.max(total || domTotal(), 1);
+		const perRow = Math.max(1, sc.scrollHeight / count);
+		let target = (row / count) * (sc.scrollHeight - sc.clientHeight);
+
+		for (let attempt = 0; attempt < 12; attempt++) {
 			sc.scrollTop = Math.max(0, Math.min(target, sc.scrollHeight));
-			await new Promise(r => setTimeout(r, 150));
+			sc.dispatchEvent(new Event('scroll', { bubbles: true }));
+			await new Promise(r => setTimeout(r, 250));
+
 			hit = exact();
+			if (hit) return hit;
+
+			const here = rowInView(sc);
+			if (here === null) break;
+			target = sc.scrollTop + (row - here) * perRow;
 		}
-		return hit || null;
+		return null;
 	}
-
-	// -------------------------------------------------------------- the UI
-
-	let host = null, shadow = null, bar = null, input = null, status = null, panel = null;
 
 	const UI_CSS = `
 :host { all: initial; }
@@ -323,7 +340,7 @@ input {
 		let el = turn.el || byMessageId(turn.id);
 		if (!el && typeof turn.row === 'number' && site.row) {
 			say('finding turn ' + turn.n + '\u2026');
-			el = await seek(turn.row);
+			el = await seek(turn.row, found.total);
 		}
 		if (!el) {
 			say('turn ' + turn.n + ' is not loaded - scroll to it: ' + turn.text);

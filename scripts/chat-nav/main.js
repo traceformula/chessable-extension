@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.32.1';
+	ns.version = '1.32.2';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -193,6 +193,10 @@
 		}
 		return null;
 	}
+
+	// -------------------------------------------------------------- the UI
+
+	let host = null, shadow = null, bar = null, input = null, status = null, panel = null;
 
 	const UI_CSS = `
 :host { all: initial; }

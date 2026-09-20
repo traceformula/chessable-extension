@@ -197,6 +197,44 @@ with an id and text, and both mounted turns matched their rendered element by
 sits. There is no seeking to an unmounted one: nothing in the page says where it
 would go, unlike claude.ai's numbered rows.
 
+## A scripted edit killed the whole subsystem for four commits
+
+v1.32.2. The colon had not been going into the composer because of anything
+claude.ai did. `chat-nav/main.js` was throwing `ReferenceError: host is not
+defined` on the first key it ever saw.
+
+The seek rewrite in e89a672 replaced a slice of the file ending at
+`const UI_CSS =`, and the text it cut out included the line above it:
+
+    let host = null, shadow = null, bar = null, input = null, status = null, panel = null;
+
+`build()` assigns `host`, which in sloppy mode quietly creates a global, so the
+file parsed and loaded. But `fromOurUi()` *reads* `host` on the first line of
+the key handler, before anything has been built, and reading an undeclared
+variable throws. So every key threw, and the subsystem was dead from e89a672
+onwards - no command line, no `:ls`, no fold. The seek fix in that same commit
+was never exercised either.
+
+Nothing caught it. `node --check` parses the file happily. The 110 tests all
+passed, because every one of them tests a pure module and none of them calls
+the handler. And the fault is invisible from the page: the listeners live in the
+extension's world, so the exception lands in a console nobody was reading, and
+from outside "never ran" and "ran and declined" look the same - which is what
+three rounds of diagnosis were spent on.
+
+`test/chatnav-smoke.test.js` now loads `main.js` under a stub DOM, captures the
+registered handler and **calls it directly**, for the same reason
+`hints.test.js` does: a listener that throws inside `dispatchEvent` reports
+asynchronously and a test would sail straight past it. Verified against the bug
+- removing that declaration again fails four of its five cases with `host is not
+defined`, and restoring it passes all five.
+
+Third time a scripted edit has silently removed or duplicated something in this
+project. Replacing a *range* between two anchors is the dangerous shape, far
+more than replacing a matched string: the end anchor says nothing about what
+sits just before it. Assert on what is being removed, not only on what is being
+matched.
+
 ## The release has to be held, and the decision has to be readable
 
 v1.32.0, after `:` still went into the composer once Escape had released it.

@@ -376,6 +376,42 @@ release ships with the rest of the page layer, so `blur.js` had to go into
 `PAGE_JS` in the service worker as well as into the manifest entry. Missing one
 of the two is the obvious way to half-ship this.
 
+## Seeking on ChatGPT, and where the seek stops being provable
+
+v1.34.0. Clicking a turn in the outline did nothing on ChatGPT: `jump()` could
+only reach a message the page happened to have mounted, and on a 64-turn
+conversation that is about five of them.
+
+The seek is now one routine for both sites, differing only in how it answers
+"where am I":
+
+- claude.ai numbers its rows, `data-index` on each `transcript-row`.
+- ChatGPT numbers nothing, but every message element carries `data-message-id`,
+  and the loaded branch says where that id comes in the order. So the id *is*
+  the index, and `turnsFromConversation` now returns `order` alongside the
+  turns. Verified against the live conversation: five mounted messages, all five
+  resolving to branch positions, reporting position 144 of 160.
+
+**The ChatGPT seek is unverified, and the reason is worth writing down.** The
+same loop that lands claude.ai on the first attempt gets nowhere here: the
+scroll moves - 12,879px, then 0 - but the mounted set never changes, so every
+correction is computed from the same stale position. claude.ai's virtualizer
+renders from a scroll handler, which a dispatched `scroll` event reaches;
+ChatGPT's does not answer that, and is most likely driven by an
+IntersectionObserver, which needs the page to actually paint. The tab used for
+all of this reports `visibilityState: "hidden"` and never paints, so this
+environment cannot tell a virtualizer that will not respond from one that merely
+cannot. In a real tab it may well work.
+
+Two guards came out of that anyway, and both are worth having regardless:
+
+- If a correction would not move the scroll, the loop stops instead of spending
+  twelve attempts arriving at the same place.
+- On failure the scroll is **left at its best guess** rather than put back. The
+  estimate is proportional and lands near the turn, so even when the page will
+  not mount it for us the user ends up next to it, and the message says exactly
+  that rather than appearing to do nothing.
+
 ## Going back in after Escape
 
 v1.33.0. Escape without a way back is a one-way door, so `i` returns - vim's

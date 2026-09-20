@@ -73,7 +73,11 @@
 			turns.push({ id: message.id || null, row: position, text });
 		});
 		if (!turns.length) return null;
-		return { turns, total: branch.length };
+		// Every message on the branch, in order. A mounted message carries its id
+		// on the element, so this is what turns "which message is on screen" into
+		// "how far through the conversation are we" - the ChatGPT equivalent of
+		// the row index claude.ai puts in the DOM.
+		return { turns, total: branch.length, order: branch.map(m => m.id || null) };
 	}
 
 	function conversationId() {

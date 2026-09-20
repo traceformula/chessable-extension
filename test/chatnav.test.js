@@ -288,5 +288,22 @@ test('a cycle in the mapping does not hang the walk', () => {
 	assert.ok(out === null || out.turns.length <= 2);
 });
 
+test('the branch order comes back, so a mounted message says where we are', () => {
+	// ChatGPT numbers nothing in the DOM, but every message carries its id.
+	// Its position in this list is what makes seeking to an unmounted turn
+	// possible at all.
+	const payload = tree([
+		node('root', null, null, null),
+		node('a', 'root', 'user', 'first'),
+		node('b', 'a', 'assistant', 'reply'),
+		node('c', 'b', 'user', 'second'),
+	], 'c');
+	const out = gpt.turnsFromConversation(payload);
+	assert.deepStrictEqual(out.order, ['a', 'b', 'c']);
+	// the user turns index into that order
+	assert.strictEqual(out.order[out.turns[0].row], 'a');
+	assert.strictEqual(out.order[out.turns[1].row], 'c');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

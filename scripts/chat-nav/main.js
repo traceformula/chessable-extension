@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.33.0';
+	ns.version = '1.34.0';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -124,13 +124,14 @@
 				return {
 					complete: true,
 					total: loaded.total,
+					order: loaded.order || null,
 					turns: loaded.turns.map((turn, i) => ({
 						n: i + 1, row: turn.row, id: turn.id || null, text: label(turn.text),
 					})),
 				};
 			}
 		}
-		return { complete: !virtualized(), total: domTotal(), turns: domTurns() };
+		return { complete: !virtualized(), total: domTotal(), order: null, turns: domTurns() };
 	}
 
 	// ChatGPT gives every message an id and puts it on the rendered element, so
@@ -142,21 +143,49 @@
 		return document.querySelector('[data-message-id="' + id + '"]');
 	}
 
+	// The element for a turn, if the page currently holds one.
+	function locate(turn) {
+		if (site.row && typeof turn.row === 'number') {
+			const row = document.querySelector(site.row + '[data-index="' + turn.row + '"]');
+			if (row) return row;
+		}
+		return byMessageId(turn.id);
+	}
+
 	// Which mounted row is actually in front of the viewport.
 	//
 	// Not the lowest or highest index mounted: the last few rows of a
 	// conversation stay mounted wherever you are, so min and max together span
 	// almost the whole transcript and would say we are already where we want to
 	// be. What is on screen is the only honest answer to "where am I".
-	function rowInView(sc) {
+	function nearestToMiddle(sc, selector) {
 		const middle = sc.getBoundingClientRect().top + sc.clientHeight / 2;
 		let best = null, bestDistance = Infinity;
-		for (const row of rowEls()) {
-			const box = row.getBoundingClientRect();
+		for (const el of document.querySelectorAll(selector)) {
+			const box = el.getBoundingClientRect();
 			const distance = Math.abs((box.top + box.bottom) / 2 - middle);
-			if (distance < bestDistance) { bestDistance = distance; best = row; }
+			if (distance < bestDistance) { bestDistance = distance; best = el; }
 		}
-		return best ? Number(best.dataset.index) : null;
+		return best;
+	}
+
+	// How far through the conversation the viewport is sitting.
+	//
+	// Two sites, two ways of saying it. claude.ai numbers its rows in the DOM.
+	// ChatGPT numbers nothing, but every message carries its id, and the loaded
+	// branch says where that id comes in the order - so the id is the index.
+	function positionInView(sc, order) {
+		if (site.row) {
+			const row = nearestToMiddle(sc, site.row);
+			if (!row) return null;
+			const index = Number(row.dataset.index);
+			return isNaN(index) ? null : index;
+		}
+		if (!order) return null;
+		const message = nearestToMiddle(sc, '[data-message-id]');
+		if (!message) return null;
+		const at = order.indexOf(message.getAttribute('data-message-id'));
+		return at < 0 ? null : at;
 	}
 
 	// Bring a row that is not in the page into it.
@@ -167,29 +196,36 @@
 	// dispatched by hand afterwards. And the correction is measured from the row
 	// actually on screen, then applied as a proportion of the average row
 	// height, which lands on the first attempt in practice.
-	async function seek(row, total) {
+	async function seek(turn, total, order) {
 		const sc = scroller();
-		if (!sc || !site.row) return null;
-		const exact = () => document.querySelector(site.row + '[data-index="' + row + '"]');
+		if (!sc || typeof turn.row !== 'number') return null;
 
-		let hit = exact();
+		let hit = locate(turn);
 		if (hit) return hit;
 
 		const count = Math.max(total || domTotal(), 1);
 		const perRow = Math.max(1, sc.scrollHeight / count);
-		let target = (row / count) * (sc.scrollHeight - sc.clientHeight);
+		let target = (turn.row / count) * (sc.scrollHeight - sc.clientHeight);
 
 		for (let attempt = 0; attempt < 12; attempt++) {
 			sc.scrollTop = Math.max(0, Math.min(target, sc.scrollHeight));
+			// Moving scrollTop does not tell a virtualizer that renders from its
+			// own scroll handler. Saying it out loud costs nothing where the page
+			// would have noticed anyway.
 			sc.dispatchEvent(new Event('scroll', { bubbles: true }));
 			await new Promise(r => setTimeout(r, 250));
 
-			hit = exact();
+			hit = locate(turn);
 			if (hit) return hit;
 
-			const here = rowInView(sc);
+			const here = positionInView(sc, order);
+			// Nothing recognisable on screen, or the page is not re-rendering for
+			// us. Either way the guesses cannot improve, so stop guessing - the
+			// scroll is left where it is, which is near enough to be useful.
 			if (here === null) break;
-			target = sc.scrollTop + (row - here) * perRow;
+			const next = sc.scrollTop + (turn.row - here) * perRow;
+			if (Math.round(next) === Math.round(sc.scrollTop)) break;
+			target = next;
 		}
 		return null;
 	}
@@ -341,13 +377,16 @@ input {
 			return;
 		}
 
-		let el = turn.el || byMessageId(turn.id);
-		if (!el && typeof turn.row === 'number' && site.row) {
+		let el = turn.el || locate(turn);
+		if (!el && typeof turn.row === 'number') {
 			say('finding turn ' + turn.n + '\u2026');
-			el = await seek(turn.row, found.total);
+			el = await seek(turn, found.total, found.order);
 		}
 		if (!el) {
-			say('turn ' + turn.n + ' is not loaded - scroll to it: ' + turn.text);
+			// The seek leaves the scroll at its best guess rather than putting it
+			// back, so this lands near the turn even when the page would not load
+			// it for us. Saying which is better than appearing to do nothing.
+			say('turn ' + turn.n + ' did not load; scrolled to about where it is  \u00b7  ' + turn.text);
 			return;
 		}
 		el.scrollIntoView({ block: 'center', behavior: 'smooth' });

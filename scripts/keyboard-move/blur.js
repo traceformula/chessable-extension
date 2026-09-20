@@ -57,15 +57,54 @@
 		return isEditable(active);
 	}
 
+	// Sites answer Escape themselves, and some of them answer it by putting the
+	// cursor straight back where it was. Releasing once is then worth nothing:
+	// the box takes focus again before the next key is typed, and the shortcut
+	// that key was meant for goes into the text instead.
+	//
+	// So the release is held briefly. For a moment afterwards, a text box that
+	// takes focus back loses it again. A press of the pointer or of Tab ends the
+	// hold at once - those are the user asking for that box, and the point is to
+	// beat the page, never the person.
+	const HOLD = 1000;
+	let holdUntil = 0;
+
+	function stamp(what) {
+		try { document.documentElement.dataset.kbmEsc = what; } catch (e) { /* early */ }
+	}
+
 	function install() {
 		window.addEventListener('keydown', function (e) {
+			if (e.key === 'Tab') { holdUntil = 0; return; }
+
 			const active = deepActive(document);
-			if (!shouldRelease(e, active)) return;
+			if (!shouldRelease(e, active)) {
+				if (e.key === 'Escape') stamp('nothing to release');
+				return;
+			}
+
+			// Now, so the next keystroke lands outside the box whatever the page
+			// does with this one.
+			if (active.blur) active.blur();
+			holdUntil = Date.now() + HOLD;
+			stamp('released ' + (active.tagName || '?').toLowerCase());
+
+			// And again once the page has had its own turn with the key, for a
+			// page that answers Escape by refocusing.
 			setTimeout(function () {
-				// Only if the page has not already moved focus somewhere itself.
-				if (deepActive(document) === active && active.blur) active.blur();
+				const now = deepActive(document);
+				if (isEditable(now) && now.blur) now.blur();
 			}, 0);
 		}, true);
+
+		document.addEventListener('focusin', function (e) {
+			if (Date.now() > holdUntil) return;
+			const el = originalTarget(e) || e.target;
+			if (isEditable(el) && el.blur) { el.blur(); stamp('held off ' + (el.tagName || '?').toLowerCase()); }
+		}, true);
+
+		// The pointer always wins: clicking into a box is asking for it.
+		document.addEventListener('pointerdown', function () { holdUntil = 0; }, true);
 	}
 
 	return { isEditable, shouldRelease, originalTarget, deepActive, install };

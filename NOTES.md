@@ -197,6 +197,42 @@ with an id and text, and both mounted turns matched their rendered element by
 sits. There is no seeking to an unmounted one: nothing in the page says where it
 would go, unlike claude.ai's numbered rows.
 
+## The release has to be held, and the decision has to be readable
+
+v1.32.0, after `:` still went into the composer once Escape had released it.
+
+Two things came out of failing to reproduce it.
+
+**A release that lasts no time is worth nothing.** These composers answer
+Escape themselves, and at least one of them answers by taking focus back. The
+blur was also deferred a tick, on purpose, so the page could handle Escape with
+focus still where it expected - which hands the page the last word on where the
+cursor ends up. Now the blur happens immediately, once more after the page has
+had its turn, and the release is *held*: for a second afterwards a text box that
+takes focus back loses it again. A pointer press or Tab ends the hold at once,
+because those are the user asking for that box. The point is to beat the page,
+never the person.
+
+**Whose branch a keystroke took was invisible.** These listeners live in the
+extension's own world, so nothing about them appears in the console of the page
+they run on, and from outside there is no way to tell "never ran" from "ran and
+declined" - which is the whole of most bug reports here. Both subsystems now
+write their last decision where it can be read back:
+
+    document.documentElement.dataset.kbmEsc         "released div" / "held off div"
+    document.documentElement.dataset.chatNavLast    "colon opened the command line"
+                                                    "colon declined, cursor in div"
+
+**Why this could not be tested here.** The automation tab reports
+`visibilityState: "hidden"`, and a hidden tab clamps `setTimeout(0)` to about a
+second - which is exactly the deferral the old release depended on. Focus and
+key timing in that tab therefore say nothing about a real one. A probe listener
+added from the console also sees nothing, because the site stops immediate
+propagation and anything registered late is behind it; that is expected and is
+not evidence either way about our own listeners, which register first. The
+stamps above exist because this is the class of bug this environment cannot
+reach.
+
 **claude.ai swallows keys from anything that registers late.** Escape released
 the composer, then the colon went straight back into it and no command line
 appeared.

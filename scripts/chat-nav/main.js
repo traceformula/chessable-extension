@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.31.2';
+	ns.version = '1.32.0';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -542,6 +542,28 @@ input {
 		return !!host && e.target === host;
 	}
 
+	// Written where it can be read back from the page. Which branch a keystroke
+	// took is otherwise invisible: these listeners live in the extension's own
+	// world, so nothing about them shows up in the console of the page they are
+	// running on, and the difference between "never ran" and "ran and declined"
+	// is the whole of most bug reports here.
+	function stamp(what) {
+		try { document.documentElement.dataset.chatNavLast = what; } catch (e) { /* early */ }
+	}
+
+	// A composer that answers Escape by refocusing itself must not undo the
+	// release. Pointer and Tab end the hold: those are the user asking.
+	const HOLD = 1000;
+	let holdUntil = 0;
+
+	document.addEventListener('focusin', function (e) {
+		if (Date.now() > holdUntil) return;
+		const el = keyTarget(e) || e.target;
+		if (editable(el) && el.blur) { el.blur(); stamp('held the release'); }
+	}, true);
+
+	document.addEventListener('pointerdown', function () { holdUntil = 0; }, true);
+
 	function onKey(e) {
 		if (e.defaultPrevented || fromOurUi(e)) return;
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -550,15 +572,20 @@ input {
 			if (e.shiftKey) return;
 			const active = deepActive();
 			if (editable(active)) {
-				// Give the keyboard back, the way vim leaves insert mode. The key
-				// itself is left alone, since both sites bind Escape themselves,
-				// and the blur waits a tick so that a composer answering Escape by
-				// refocusing itself loses to us rather than the other way round.
+				// Give the keyboard back, the way vim leaves insert mode, and hold
+				// it back: these composers answer Escape by taking focus again, and
+				// a release that lasts no time at all is worth nothing - the next
+				// key goes into the message box instead of reaching the colon.
+				if (active.blur) active.blur();
+				holdUntil = Date.now() + HOLD;
+				stamp('esc released ' + (active.tagName || '?').toLowerCase());
 				setTimeout(function () {
-					if (deepActive() === active && active.blur) active.blur();
+					const now = deepActive();
+					if (editable(now) && now.blur) now.blur();
 				}, 0);
 				return;
 			}
+			stamp('esc, nothing focused');
 			if (panel && !panel.hidden) closePanel();
 			return;
 		}
@@ -566,7 +593,13 @@ input {
 		// Shift is not excluded above: ":" needs it on most layouts.
 		if (e.key !== ':') return;
 		// Never while they are writing a prompt - a colon belongs in the text.
-		if (editable(keyTarget(e)) || editable(deepActive())) return;
+		const into = editable(keyTarget(e)) ? keyTarget(e)
+			: (editable(deepActive()) ? deepActive() : null);
+		if (into) {
+			stamp('colon declined, cursor in ' + (into.tagName || '?').toLowerCase());
+			return;
+		}
+		stamp('colon opened the command line');
 		e.preventDefault();
 		// Immediate, not just stopPropagation: claude.ai has its own keydown
 		// listener on window that redirects a keystroke into the composer, and

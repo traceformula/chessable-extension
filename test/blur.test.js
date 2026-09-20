@@ -1,5 +1,5 @@
 const assert = require('assert');
-const { isEditable, shouldRelease, originalTarget, deepActive } = require('../scripts/keyboard-move/blur.js');
+const { isEditable, shouldRelease, shouldResume, originalTarget, deepActive } = require('../scripts/keyboard-move/blur.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -109,6 +109,41 @@ test('a shadow-rooted text box releases on Escape', () => {
 	assert.ok(shouldRelease(esc(), active));
 	// and the host alone, which is what the old code saw, does not
 	assert.ok(!shouldRelease(esc(), host));
+});
+
+// --------------------------------------------------------- the way back in
+
+test('"i" outside a text box asks to go back in', () => {
+	assert.ok(shouldResume({ key: 'i' }, el('BODY')));
+});
+
+test('"i" inside a text box is just a letter', () => {
+	// Otherwise the word "into" could never be typed.
+	assert.ok(!shouldResume({ key: 'i' }, el('TEXTAREA')));
+	assert.ok(!shouldResume({ key: 'i' }, el('DIV', { isContentEditable: true })));
+});
+
+test('a modified or capital i is left alone', () => {
+	for (const mod of ['metaKey', 'ctrlKey', 'altKey', 'shiftKey']) {
+		assert.ok(!shouldResume({ key: 'i', [mod]: true }, el('BODY')), mod);
+	}
+});
+
+test('other letters do not resume', () => {
+	assert.ok(!shouldResume({ key: 'a' }, el('BODY')));
+	assert.ok(!shouldResume({ key: 'Escape' }, el('BODY')));
+	assert.ok(!shouldResume(null, el('BODY')));
+});
+
+test('release and resume are never both true for one key', () => {
+	// They are opposite gestures and must not overlap.
+	for (const key of ['i', 'Escape', 'a']) {
+		for (const active of [el('BODY'), el('TEXTAREA')]) {
+			const e = { key };
+			assert.ok(!(shouldRelease(e, active) && shouldResume(e, active)),
+				key + ' on ' + active.tagName);
+		}
+	}
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

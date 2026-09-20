@@ -376,6 +376,30 @@ release ships with the rest of the page layer, so `blur.js` had to go into
 `PAGE_JS` in the service worker as well as into the manifest entry. Missing one
 of the two is the obvious way to half-ship this.
 
+## Going back in after Escape
+
+v1.33.0. Escape without a way back is a one-way door, so `i` returns - vim's
+key for starting to type.
+
+It returns to **the element Escape released**, remembered at the time, rather
+than to whatever looks most like a text box now. That distinction is the feature
+working at all rather than not: Monaco, which onecompiler.com runs, takes its
+keystrokes through a `textarea.inputarea` measured at 5px tall, so every
+plausible heuristic - largest text box, first text box, most visible - picks
+something else entirely.
+
+Verified end to end on onecompiler.com/java rather than by focus checks alone,
+since focus landing on an element proves nothing about whether an editor is
+listening: click into the editor, blur it, focus the remembered element, then
+type with real keys. "ZZTOP" appeared at the cursor on line 1. Monaco needs
+nothing beyond focus on that textarea.
+
+`i` stands down wherever letters are already spoken for - `kbmBoardScripts` is
+set on a board page, where moves are spelled with letters and a xiangqi file is
+literally called "i", and the hint and find layers own the keyboard outright
+while they are up. A unit test also pins that release and resume can never both
+be true for one key.
+
 ## Shadow roots hide the text box from every guard
 
 Found v1.29.1, from a report that ":collapse" could only be typed as ":collape"

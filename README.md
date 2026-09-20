@@ -245,7 +245,17 @@ their own dialog, and the release waits a tick so the page handles its own
 Escape first. An editor that answers Escape by refocusing itself therefore
 loses to us rather than the other way round.
 
-For a site that is not built in, this arrives with the rest of the page
+**`i` goes back in**, the way vim uses it to start typing - the cursor returns
+to the very box Escape left, so Escape is not a one-way door. It returns to the
+remembered box rather than guessing at one, which is what makes it work in a
+code editor: the Monaco editor behind onecompiler.com takes its keystrokes
+through a textarea a few pixels tall, and anything picking the largest or first
+text box on the page would never find it.
+
+`i` is left alone wherever letters are already spoken for - on a board page,
+where moves are spelled with them, and while the hints or the find bar are up.
+
+For a site that is not built in, both of these arrive with the rest of the page
 navigation once you add the site below.
 
 ### Adding other sites

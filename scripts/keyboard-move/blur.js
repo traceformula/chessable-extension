@@ -51,6 +51,18 @@
 		return el;
 	}
 
+	// The way back in, so Escape is not a one-way door. "i" is what vim uses to
+	// start typing, and the thing to return to is the very box Escape left -
+	// remembered rather than guessed, because the guess would be wrong on the
+	// editors that need it most. Monaco, which onecompiler.com runs on, takes
+	// its keystrokes through a textarea a few pixels tall; anything picking the
+	// largest or the first text box on the page would never find it.
+	function shouldResume(e, active) {
+		if (!e || e.key !== 'i') return false;
+		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
+		return !isEditable(active);
+	}
+
 	function shouldRelease(e, active) {
 		if (!e || e.key !== 'Escape') return false;
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
@@ -68,9 +80,27 @@
 	// beat the page, never the person.
 	const HOLD = 1000;
 	let holdUntil = 0;
+	let released = null;
 
 	function stamp(what) {
 		try { document.documentElement.dataset.kbmEsc = what; } catch (e) { /* early */ }
+	}
+
+	// Letters belong to whoever is already using them: the board scripts spell
+	// moves with them, and a xiangqi file really is called "i". The hint and
+	// find layers own the keyboard outright while they are up.
+	function lettersAreTaken() {
+		const flags = document.documentElement.dataset;
+		if (flags.kbmBoardScripts === '1' || flags.kbmHints === '1') return true;
+		const ns = globalThis.__KBM || {};
+		if (ns.hints && ns.hints.isActive && ns.hints.isActive()) return true;
+		if (ns.find && ns.find.isOpen && ns.find.isOpen()) return true;
+		return false;
+	}
+
+	function stillThere(el) {
+		return !!el && typeof el.focus === 'function' &&
+			(el.isConnected !== false) && document.contains(el);
 	}
 
 	function install() {
@@ -78,6 +108,16 @@
 			if (e.key === 'Tab') { holdUntil = 0; return; }
 
 			const active = deepActive(document);
+
+			if (shouldResume(e, active) && !lettersAreTaken()) {
+				if (!stillThere(released)) { stamp('nothing to go back to'); return; }
+				e.preventDefault();
+				holdUntil = 0;              // asked for, so nothing holds it off
+				released.focus();
+				stamp('back in ' + (released.tagName || '?').toLowerCase());
+				return;
+			}
+
 			if (!shouldRelease(e, active)) {
 				if (e.key === 'Escape') stamp('nothing to release');
 				return;
@@ -85,6 +125,7 @@
 
 			// Now, so the next keystroke lands outside the box whatever the page
 			// does with this one.
+			released = active;
 			if (active.blur) active.blur();
 			holdUntil = Date.now() + HOLD;
 			stamp('released ' + (active.tagName || '?').toLowerCase());
@@ -107,5 +148,5 @@
 		document.addEventListener('pointerdown', function () { holdUntil = 0; }, true);
 	}
 
-	return { isEditable, shouldRelease, originalTarget, deepActive, install };
+	return { isEditable, shouldRelease, shouldResume, originalTarget, deepActive, install };
 });

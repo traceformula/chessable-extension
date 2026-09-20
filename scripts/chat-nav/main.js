@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.32.0';
+	ns.version = '1.32.1';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -565,8 +565,20 @@ input {
 	document.addEventListener('pointerdown', function () { holdUntil = 0; }, true);
 
 	function onKey(e) {
-		if (e.defaultPrevented || fromOurUi(e)) return;
+		// Once per key however many targets we are listening on.
+		if (e.__chatNavSeen) return;
+		e.__chatNavSeen = true;
+
+		// Stamped before any decision, so that a report can tell a key we never
+		// received from one we received and turned down. Those two look identical
+		// from outside the extension's world and want opposite fixes.
+		stamp('saw ' + e.key + (e.defaultPrevented ? ' (page took it first)' : ''));
+
+		if (fromOurUi(e)) return;
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		// defaultPrevented is deliberately not a reason to stand down. A page that
+		// answers a key it does not own should not also get to silence us; the
+		// guard that matters is whether the cursor is in a text box, below.
 
 		if (e.key === 'Escape') {
 			if (e.shiftKey) return;
@@ -615,9 +627,13 @@ input {
 	// Registered at document_start, before any of the site's own scripts have
 	// run. That ordering is the whole point: claude.ai registers a keydown
 	// listener on window that calls stopImmediatePropagation, so anything
-	// registered after it never hears a key at all. Whoever registers first on
-	// window wins, and it has to be us.
+	// registered after it never hears a key at all.
+	//
+	// On both window and document, as the board scripts already do. A listener
+	// that stops the event dead on one of them does not necessarily reach the
+	// other, and the flag on the event keeps the handler to one run per key.
 	window.addEventListener('keydown', onKey, true);
+	document.addEventListener('keydown', onKey, true);
 
 	// A folded reply opens where you click it, so the fold never hides
 	// something you cannot get back.

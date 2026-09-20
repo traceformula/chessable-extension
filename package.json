@@ -1,10 +1,10 @@
 {
   "name": "chess-utility",
-  "version": "1.28.0",
+  "version": "1.29.0",
   "private": true,
   "description": "Chrome extension: type chess moves instead of dragging them, plus keyboard navigation on any site",
   "scripts": {
-    "test": "node test/matcher.test.js && node test/engine.test.js && node test/hints.test.js && node test/chatnav.test.js",
+    "test": "node test/matcher.test.js && node test/engine.test.js && node test/hints.test.js && node test/blur.test.js && node test/chatnav.test.js",
     "package": "bash tools/package.sh"
   }
 }

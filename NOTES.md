@@ -159,6 +159,37 @@ The `:mute` noise lists are near-empty on purpose. Guessing selectors for
 promotional elements risks hiding real UI, so it hides only what it can name and
 says "nothing matched" otherwise, rather than pretending to have worked.
 
+## Escape as the way back to the shortcuts
+
+Added v1.29.0, in both subsystems separately - `scripts/keyboard-move/blur.js`
+for the page layer and a few lines inside chat-nav's key handler. Duplicated on
+purpose rather than shared, to keep the two apart.
+
+Standing down inside a text box is correct, but it left no way back except the
+mouse. Escape is the way back.
+
+Two choices worth keeping:
+
+- **The key is not consumed.** Many pages bind Escape to close their own dialog
+  or cancel their own edit. Taking focus away is all this needs.
+- **The blur is deferred one tick.** The page gets its own Escape first, with
+  focus still where it expects it, and an editor that answers Escape by
+  refocusing itself loses to us rather than the other way round. The deferred
+  callback re-checks that focus has not already moved on its own.
+
+Measured before shipping, since the extension cannot be reloaded from a tool:
+
+- claude.ai composer is a `contenteditable` div; `blur()` sticks, focus lands on
+  `BODY` and stays there.
+- onecompiler.com runs Monaco, which focuses a real `textarea.inputarea`. A full
+  rehearsal - focus, dispatch Escape, deferred blur - left focus on `BODY` and
+  it stayed there. Monaco does not fight back.
+
+A site that is not built in needs adding through the options page first; the
+release ships with the rest of the page layer, so `blur.js` had to go into
+`PAGE_JS` in the service worker as well as into the manifest entry. Missing one
+of the two is the obvious way to half-ship this.
+
 ## Match patterns
 
 Chrome match patterns are host-exact: `https://www.site.com/*` does not match

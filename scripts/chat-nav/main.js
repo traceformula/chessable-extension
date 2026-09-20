@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.28.0';
+	ns.version = '1.29.0';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -378,9 +378,37 @@ input {
 		return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 	}
 
+	// An event raised inside our shadow root is retargeted to the host on its
+	// way out, which is how we tell the command line's own keystrokes from the
+	// page's. Without this a colon typed into the command line would be read as
+	// a fresh ":" and clear what had been typed so far.
+	function fromOurUi(e) {
+		return !!host && e.target === host;
+	}
+
 	function onKey(e) {
-		if (e.key !== ':' || e.metaKey || e.ctrlKey || e.altKey) return;
-		if (e.defaultPrevented) return;
+		if (e.defaultPrevented || fromOurUi(e)) return;
+		if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+		if (e.key === 'Escape') {
+			if (e.shiftKey) return;
+			const active = document.activeElement;
+			if (editable(active)) {
+				// Give the keyboard back, the way vim leaves insert mode. The key
+				// itself is left alone, since both sites bind Escape themselves,
+				// and the blur waits a tick so that a composer answering Escape by
+				// refocusing itself loses to us rather than the other way round.
+				setTimeout(function () {
+					if (document.activeElement === active && active.blur) active.blur();
+				}, 0);
+				return;
+			}
+			if (panel && !panel.hidden) closePanel();
+			return;
+		}
+
+		// Shift is not excluded above: ":" needs it on most layouts.
+		if (e.key !== ':') return;
 		// Never while they are writing a prompt - a colon belongs in the text.
 		if (editable(e.target) || editable(document.activeElement)) return;
 		e.preventDefault();

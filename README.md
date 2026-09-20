@@ -232,6 +232,22 @@ the document itself does not scroll the largest scrolling panel on screen is
 used — board pages are often a fixed shell around one scrolling column, where
 scrolling the document does nothing at all.
 
+### Getting the keyboard back
+
+Every shortcut stands down while the cursor is in a text box, which is right: a
+`;` typed into a search field is a semicolon. **Escape gives the keyboard
+back** - the same gesture vim uses to leave insert mode. It works on ordinary
+inputs, on rich composers, and on code editors like the Monaco editor behind
+onecompiler.com.
+
+The keypress itself is not consumed, since plenty of pages bind Escape to close
+their own dialog, and the release waits a tick so the page handles its own
+Escape first. An editor that answers Escape by refocusing itself therefore
+loses to us rather than the other way round.
+
+For a site that is not built in, this arrives with the rest of the page
+navigation once you add the site below.
+
 ### Adding other sites
 
 Link hints and scrolling can run anywhere, not just the chess sites. Open the
@@ -276,7 +292,8 @@ jumping between turns. It shares no code with the chess side, so a selector
 going stale on one of those sites cannot affect a board.
 
 Press `:` anywhere except while writing a prompt - a colon typed in the composer
-is just a colon.
+is just a colon. **Escape leaves the composer**, so `:` works again without
+reaching for the mouse.
 
 | Command | Does |
 | --- | --- |

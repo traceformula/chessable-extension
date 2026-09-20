@@ -316,6 +316,19 @@ quoted blocks are skipped, since a prompt often opens with a question and then
 pastes a wall of code. Nothing is sent anywhere to produce it, which is what
 makes it work signed out as well as signed in, and instantly either way.
 
+Both sites keep only part of a long conversation in the page, so counting what
+is on screen counts the wrong thing. The outline is read instead from the same
+endpoint the site itself loads, with your own session and same origin - nothing
+is sent anywhere else, and no model is asked anything. On claude.ai cookies are
+enough. **ChatGPT needs the session access token**, which the extension reads
+from the page's own `/api/auth/session` and sends to `chatgpt.com` and nowhere
+else; it is never logged, stored, or put in the DOM. If either read fails the
+panel falls back to the loaded turns and says so rather than inventing a count.
+
+Jumping reaches any turn that is loaded. On claude.ai it can also scroll to one
+that is not, since the rows are numbered; on ChatGPT nothing in the page says
+where an unmounted turn would go, so `:N` will tell you to scroll to it.
+
 When a site reshuffles its markup the selectors here go stale. That is reported
 out loud rather than showing an empty panel, and `:help` names the selector that
 is currently matching. The fix is one line in `scripts/chat-nav/sites.js`.

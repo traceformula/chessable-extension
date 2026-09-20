@@ -184,8 +184,18 @@ every edit and regeneration; the conversation as displayed is the path from
 messages. Counting mapping nodes would overcount by every branch the user ever
 abandoned. User text is in `message.content.parts`, an array of strings.
 
-Until that decision is made, ChatGPT reports what it can stand behind: the turns
-that are loaded, and plainly that the rest is not, with no invented total.
+That decision was taken - use the token - and `chatgpt-api.js` does it. The
+token is read from the page's own session endpoint, held in a closure for the
+life of the tab, and sent to exactly the host it came from. It is never logged,
+stored, or written to the DOM. A 401 or 403 refetches once, in case it expired
+while the tab sat open, and then gives up and lets the DOM answer.
+
+Verified against the live conversation: 165 mapping nodes, 160 on the live
+branch, **64 user turns** where counting the page found 2. Every turn came back
+with an id and text, and both mounted turns matched their rendered element by
+`data-message-id` - which is how jumping finds a turn without knowing where it
+sits. There is no seeking to an unmounted one: nothing in the page says where it
+would go, unlike claude.ai's numbered rows.
 
 **A warning about measuring any of this from automation.** The tab driving these
 experiments reported `visibilityState: "hidden"` and `requestAnimationFrame`

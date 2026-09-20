@@ -3,6 +3,7 @@ const { parse, COMMANDS } = require('../scripts/chat-nav/command.js');
 const { label } = require('../scripts/chat-nav/outline.js');
 const { siteFor } = require('../scripts/chat-nav/sites.js');
 const { turnsFromConversation, textOf } = require('../scripts/chat-nav/claude-api.js');
+const gpt = require('../scripts/chat-nav/chatgpt-api.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -190,6 +191,101 @@ test('an unusable payload yields nothing rather than an empty outline', () => {
 	assert.strictEqual(turnsFromConversation({}), null);
 	assert.strictEqual(turnsFromConversation({ chat_messages: [] }), null);
 	assert.strictEqual(turnsFromConversation({ chat_messages: [msg('assistant', 0, 'only replies')] }), null);
+});
+
+// --------------------------------------------------- ChatGPT's message tree
+
+// ChatGPT's payload is a tree holding every edit and regeneration, not a list.
+// The conversation as shown is the path from current_node back to the root, so
+// counting the mapping overcounts by every branch that was abandoned.
+
+const node = (id, parent, role, text, extra) => ({
+	id, parent,
+	message: role ? Object.assign({
+		id: id, author: { role }, content: { content_type: 'text', parts: [text] },
+	}, extra) : null,
+});
+
+function tree(nodes, current) {
+	const mapping = {};
+	for (const n of nodes) mapping[n.id] = n;
+	return { mapping, current_node: current };
+}
+
+test('only the live branch is counted, not abandoned edits', () => {
+	const payload = tree([
+		node('root', null, null, null),
+		node('a', 'root', 'user', 'kept question'),
+		node('b', 'a', 'assistant', 'kept answer'),
+		node('c', 'b', 'user', 'second kept question'),
+		node('d', 'c', 'assistant', 'second kept answer'),
+		// an edit of 'a' that was regenerated away - still in the mapping
+		node('x', 'root', 'user', 'abandoned question'),
+		node('y', 'x', 'assistant', 'abandoned answer'),
+	], 'd');
+	const out = gpt.turnsFromConversation(payload);
+	assert.deepStrictEqual(out.turns.map(t => t.text), ['kept question', 'second kept question']);
+	assert.strictEqual(out.total, 4, 'the branch has 4 messages, the mapping has 7');
+});
+
+test('turns come back oldest first', () => {
+	const out = gpt.turnsFromConversation(tree([
+		node('root', null, null, null),
+		node('a', 'root', 'user', 'first'),
+		node('b', 'a', 'assistant', 'reply'),
+		node('c', 'b', 'user', 'second'),
+	], 'c'));
+	assert.deepStrictEqual(out.turns.map(t => t.text), ['first', 'second']);
+	assert.deepStrictEqual(out.turns.map(t => t.id), ['a', 'c']);
+});
+
+test('messages ChatGPT hides are not turns', () => {
+	// Custom instructions arrive as user-role messages that are never shown.
+	const payload = tree([
+		node('root', null, null, null),
+		node('h', 'root', 'user', 'custom instructions',
+			{ metadata: { is_visually_hidden_from_conversation: true } }),
+		node('a', 'h', 'user', 'the real question'),
+	], 'a');
+	const out = gpt.turnsFromConversation(payload);
+	assert.deepStrictEqual(out.turns.map(t => t.text), ['the real question']);
+});
+
+test('only the typed strings of a multimodal turn are used', () => {
+	assert.strictEqual(
+		gpt.textOf({ content: { parts: [{ asset_pointer: 'file-123' }, 'what is in this image?'] } }),
+		'what is in this image?');
+	assert.strictEqual(gpt.textOf({ content: { parts: [] } }), '');
+	assert.strictEqual(gpt.textOf(null), '');
+});
+
+test('an empty turn is skipped rather than listed blank', () => {
+	const out = gpt.turnsFromConversation(tree([
+		node('root', null, null, null),
+		node('a', 'root', 'user', '   '),
+		node('b', 'a', 'user', 'real one'),
+	], 'b'));
+	assert.deepStrictEqual(out.turns.map(t => t.text), ['real one']);
+});
+
+test('a broken payload yields nothing rather than an empty outline', () => {
+	assert.strictEqual(gpt.turnsFromConversation(null), null);
+	assert.strictEqual(gpt.turnsFromConversation({}), null);
+	assert.strictEqual(gpt.turnsFromConversation({ mapping: {}, current_node: 'missing' }), null);
+	// assistant-only branch names no turns
+	assert.strictEqual(gpt.turnsFromConversation(tree([
+		node('root', null, null, null), node('a', 'root', 'assistant', 'hello'),
+	], 'a')), null);
+});
+
+test('a cycle in the mapping does not hang the walk', () => {
+	const mapping = {
+		a: { id: 'a', parent: 'b', message: { id: 'a', author: { role: 'user' },
+			content: { parts: ['q'] } } },
+		b: { id: 'b', parent: 'a', message: null },
+	};
+	const out = gpt.turnsFromConversation({ mapping, current_node: 'a' });
+	assert.ok(out === null || out.turns.length <= 2);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

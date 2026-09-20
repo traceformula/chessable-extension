@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.30.1';
+	ns.version = '1.31.0';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -116,8 +116,8 @@
 	// otherwise. `complete` says which, so nothing ever reports a count it
 	// cannot stand behind.
 	async function allTurns() {
-		const api = ns.claudeApi;
-		if (api && api.supports()) {
+		for (const api of [ns.claudeApi, ns.chatgptApi]) {
+			if (!api || !api.supports()) continue;
 			let loaded = null;
 			try { loaded = await api.load(domTotal() || null); } catch (e) { loaded = null; }
 			if (loaded && loaded.turns.length) {
@@ -125,12 +125,21 @@
 					complete: true,
 					total: loaded.total,
 					turns: loaded.turns.map((turn, i) => ({
-						n: i + 1, row: turn.row, text: label(turn.text),
+						n: i + 1, row: turn.row, id: turn.id || null, text: label(turn.text),
 					})),
 				};
 			}
 		}
 		return { complete: !virtualized(), total: domTotal(), turns: domTurns() };
+	}
+
+	// ChatGPT gives every message an id and puts it on the rendered element, so
+	// a turn can be found without knowing where it sits. Only useful while the
+	// turn is mounted: there is no seeking to one that is not, since nothing in
+	// the page says where it would go.
+	function byMessageId(id) {
+		if (!id || !/^[\w-]{1,64}$/.test(id)) return null;
+		return document.querySelector('[data-message-id="' + id + '"]');
 	}
 
 	// Walk to a row that is not in the page yet. The virtualizer renders what is
@@ -311,13 +320,13 @@ input {
 			return;
 		}
 
-		let el = turn.el || null;
-		if (!el && typeof turn.row === 'number') {
+		let el = turn.el || byMessageId(turn.id);
+		if (!el && typeof turn.row === 'number' && site.row) {
 			say('finding turn ' + turn.n + '\u2026');
 			el = await seek(turn.row);
 		}
 		if (!el) {
-			say('turn ' + turn.n + ' did not load: ' + turn.text);
+			say('turn ' + turn.n + ' is not loaded - scroll to it: ' + turn.text);
 			return;
 		}
 		el.scrollIntoView({ block: 'center', behavior: 'smooth' });

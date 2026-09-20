@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.31.1';
+	ns.version = '1.31.2';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -568,13 +568,22 @@ input {
 		// Never while they are writing a prompt - a colon belongs in the text.
 		if (editable(keyTarget(e)) || editable(deepActive())) return;
 		e.preventDefault();
-		e.stopPropagation();
+		// Immediate, not just stopPropagation: claude.ai has its own keydown
+		// listener on window that redirects a keystroke into the composer, and
+		// leaving it to run would put the colon in the message box instead.
+		e.stopImmediatePropagation();
 		openBar();
 	}
 
 	// -------------------------------------------------------------- startup
 
 	installPageCss();
+
+	// Registered at document_start, before any of the site's own scripts have
+	// run. That ordering is the whole point: claude.ai registers a keydown
+	// listener on window that calls stopImmediatePropagation, so anything
+	// registered after it never hears a key at all. Whoever registers first on
+	// window wins, and it has to be us.
 	window.addEventListener('keydown', onKey, true);
 
 	// A folded reply opens where you click it, so the fold never hides
@@ -584,9 +593,19 @@ input {
 		if (el) el.classList.remove('chatnav-fold');
 	}, true);
 
+	// The page is a bare shell at document_start, so there is nothing to hide
+	// yet; wait until it has been built.
+	function whenReady(fn) {
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', fn, { once: true });
+		} else {
+			fn();
+		}
+	}
+
 	try {
 		chrome.storage.local.get({ chatNavMuted: false }, v => {
-			if (v && v.chatNavMuted) mute(true);
+			if (v && v.chatNavMuted) whenReady(() => mute(true));
 		});
 	} catch (e) { /* storage is optional */ }
 

@@ -197,6 +197,31 @@ with an id and text, and both mounted turns matched their rendered element by
 sits. There is no seeking to an unmounted one: nothing in the page says where it
 would go, unlike claude.ai's numbered rows.
 
+**claude.ai swallows keys from anything that registers late.** Escape released
+the composer, then the colon went straight back into it and no command line
+appeared.
+
+The site has a `keydown` listener on `window` from page load that calls
+`stopImmediatePropagation()`. That kills every listener registered *after* it on
+the same target, so chat-nav - injected at `document_idle`, long after the
+site's own scripts - never heard the key at all. Measured: a probe listener
+added on window capture from the console never fired for ":" while the composer
+still received the character.
+
+The proof that ordering is the whole story was already sitting in an earlier
+bug. `scroll.js` runs at `document_start` and did receive its keys on claude.ai
+- that is exactly why the "s" in ":collapse" scrolled the page. Same page, same
+window, opposite outcome, and the only difference is which of them registered
+first.
+
+So chat-nav moved to `document_start`, ahead of every page script, and takes the
+colon with `stopImmediatePropagation()` of its own. Nothing in it needs the DOM
+at load: the interface is built on first use, and the only startup work that
+touched the page - restoring `:mute` - now waits for `DOMContentLoaded`.
+
+Whoever registers first on window wins. On a site that stops immediate
+propagation there is no second place.
+
 **Seeking to an unmounted row needs two things, and does nothing without
 either.** Both were found by watching a real conversation rather than reasoning
 about it, and the first attempt at this shipped broken.

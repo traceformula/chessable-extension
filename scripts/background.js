@@ -21,6 +21,14 @@ const BUILT_IN = [
 	'chessable.com', 'www.chessable.com',
 	'lichess.org', 'www.lichess.org',
 	'clubxiangqi.com', 'www.clubxiangqi.com',
+	// The chat sites carry their own command line from the manifest, and the
+	// page layer is declared there with it. Registering them here as well would
+	// inject everything twice - and registering them here *instead* did not
+	// work: both scripts were registered for chatgpt.com and granted, and
+	// neither ever injected, while the same registration on claude.ai did.
+	'claude.ai', 'www.claude.ai',
+	'chatgpt.com', 'www.chatgpt.com',
+	'chat.openai.com',
 ];
 
 function hostOf(origin) {

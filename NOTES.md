@@ -376,6 +376,40 @@ release ships with the rest of the page layer, so `blur.js` had to go into
 `PAGE_JS` in the service worker as well as into the manifest entry. Missing one
 of the two is the obvious way to half-ship this.
 
+## A registered content script that never injected
+
+v1.35.0. On chatgpt.com, `w`, `s` and `;` did nothing after Escape, while `:`
+and `:ls` worked.
+
+The page layer was simply not there. Measured on a live chatgpt.com page:
+`dataset.kbmPage` unset, `dataset.kbmSites` unset, `dataset.kbmEsc` unset after
+an Escape, and `window.__KBM` absent in the main world - so neither the ISOLATED
+page layer nor the MAIN-world probe had run. `dataset.chatNav` was set, which is
+why the command line worked: that one comes from the manifest.
+
+Both of them were registered and the origin was granted. Read live from a
+claude.ai page, where the page layer does run:
+
+    granted     https://chatgpt.com/*   https://www.chatgpt.com/*
+    registered  kbm-page-https___chatgpt_com__   kbm-probe-https___chatgpt_com__
+
+Registered, permitted, and never injected - while the identical registration on
+claude.ai injects on every load. No explanation was found, and this environment
+could not produce one.
+
+So the three chat hosts no longer depend on that path. They are already manifest
+hosts, because the command line is declared there, and a manifest content script
+costs no permission those entries do not already carry. The page layer and the
+probe are now declared for them alongside it, and the same hosts were added to
+`BUILT_IN` in the service worker so the runtime registration does not also fire
+and inject everything twice.
+
+**This is not a fix for the underlying fault**, only a route around it for the
+sites where we ship a first-class feature. Any site added through the options
+page still reaches the page layer the same way chatgpt.com did, and the same
+silence is possible there. `dataset.kbmPage` is the check: unset on a site that
+should have it means registered-but-not-injecting, whatever the popup says.
+
 ## Seeking on ChatGPT, and where the seek stops being provable
 
 v1.34.0. Clicking a turn in the outline did nothing on ChatGPT: `jump()` could

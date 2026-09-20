@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Chess Utility",
-  "description": "Type chess moves instead of dragging them — on chess.com, Chessable, lichess and xiangqi — plus keyboard navigation on any site.",
-  "version": "1.27.2",
+  "description": "Type chess moves instead of dragging them — on chess.com, Chessable, lichess and xiangqi — plus keyboard navigation on any site and a vim-style \":\" command line for long AI chats.",
+  "version": "1.28.0",
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",
@@ -163,6 +163,22 @@
       ],
       "all_frames": true,
       "run_at": "document_start"
+    },
+    {
+      "js": [
+        "scripts/chat-nav/sites.js",
+        "scripts/chat-nav/outline.js",
+        "scripts/chat-nav/command.js",
+        "scripts/chat-nav/main.js"
+      ],
+      "matches": [
+        "https://claude.ai/*",
+        "https://www.claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://www.chatgpt.com/*",
+        "https://chat.openai.com/*"
+      ],
+      "run_at": "document_idle"
     }
   ]
 }

@@ -268,6 +268,41 @@ resolves uniquely, since that is indistinguishable from a stray keypress.
 Changing a setting applies to chess.com tabs opened afterwards; reload an
 open tab to pick it up.
 
+## Long AI chats
+
+A separate, self-contained feature for claude.ai, chatgpt.com and
+chat.openai.com: a vim-style `:` command line for folding long transcripts and
+jumping between turns. It shares no code with the chess side, so a selector
+going stale on one of those sites cannot affect a board.
+
+Press `:` anywhere except while writing a prompt - a colon typed in the composer
+is just a colon.
+
+| Command | Does |
+| --- | --- |
+| `:N` | jump to turn N, the way `:42` jumps to a line in vim |
+| `:$` | jump to the last turn |
+| `:ls` | list the turns, then `:N` to jump |
+| `:collapse` | fold every reply down to a few lines |
+| `:expand` | unfold them again |
+| `:mute` | hide banners and promos |
+| `:help` | the list, plus which selector is currently finding turns |
+| `:quit` | close the panel |
+
+Every command may be shortened to any unique prefix, and the names are chosen so
+that no two share a first letter: `:c`, `:e`, `:l`, `:m`, `:h` and `:q` each
+resolve on one keystroke. A folded reply opens where you click it.
+
+**The outline is built from your own prompts, never from a model.** The first
+meaningful line of each thing you asked becomes its entry - code fences and
+quoted blocks are skipped, since a prompt often opens with a question and then
+pastes a wall of code. Nothing is sent anywhere to produce it, which is what
+makes it work signed out as well as signed in, and instantly either way.
+
+When a site reshuffles its markup the selectors here go stale. That is reported
+out loud rather than showing an empty panel, and `:help` names the selector that
+is currently matching. The fix is one line in `scripts/chat-nav/sites.js`.
+
 ## Installing
 
 Unpacked, for development or a single machine:

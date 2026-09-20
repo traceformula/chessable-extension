@@ -113,6 +113,52 @@ means playing a real game on the user's account. Everything around it - the
 capture, the transparency of the wrapper, the position reading in both
 orientations - is verified.
 
+## Chat transcripts: deliberately a separate subsystem
+
+Added v1.28.0 for claude.ai, chatgpt.com and chat.openai.com. Kept apart from
+the chess code on purpose: its own directory, its own `__CHATNAV` namespace, its
+own manifest entry, its own tests, and no shared imports in either direction.
+These sites reshuffle their markup far more often than the chess ones, and that
+churn must not be able to reach a board.
+
+The interface lives in a shadow root. Both sites ship very assertive global CSS,
+and a shadow root is the only way to be sure neither side bleeds into the other.
+The one thing written into the page is a stylesheet for the fold, which has to
+apply to the site's own elements.
+
+**Selectors, measured 2026-09-20 on live pages:**
+
+- claude.ai: `[data-testid="user-message"]`, `[data-testid="assistant-message"]`.
+  Clean and semantic.
+- chatgpt.com: `[data-message-author-role="user"|"assistant"]`.
+
+Note what is *not* there: `article[data-testid^="conversation-turn"]`, the
+ChatGPT selector every write-up still quotes, now matches nothing. It is kept at
+the end of the chain as a fallback and as a reminder that this is how the
+feature breaks. An empty chain is reported out loud; `:help` names the selector
+currently matching, so a stale one is a one-line fix in `sites.js`.
+
+**No virtualization on claude.ai.** An 11,720px transcript held exactly the same
+element counts at the top, the middle and the bottom, so the whole conversation
+is in the DOM and the outline is complete. Worth re-checking on a much longer
+one, and on ChatGPT, before trusting it absolutely.
+
+**claude.ai does not scroll the document.** `document.scrollingElement` reports
+754px; the transcript is an inner `overflow-y-auto` container. Nothing here
+scrolls by hand - `scrollIntoView` finds the right container by itself, verified
+moving 11015 -> 10081 inside it.
+
+Rehearsed against the live page before shipping, since the extension cannot be
+reloaded from a tool: the shadow bar renders full width and hit-tests topmost,
+the fold takes a reply from 752px to 63px, `scrollIntoView` moves the inner
+scroller, and the composer is `contenteditable` so the `:` guard catches it. The
+glue in `main.js` still wants one real pass by hand, and the signed-out ChatGPT
+page is untested - the browser here is signed in to both.
+
+The `:mute` noise lists are near-empty on purpose. Guessing selectors for
+promotional elements risks hiding real UI, so it hides only what it can name and
+says "nothing matched" otherwise, rather than pretending to have worked.
+
 ## Match patterns
 
 Chrome match patterns are host-exact: `https://www.site.com/*` does not match

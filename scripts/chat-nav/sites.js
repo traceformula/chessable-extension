@@ -36,6 +36,12 @@
 			host: /^(www\.)?chatgpt\.com$/,
 			user: ['[data-message-author-role="user"]'],
 			assistant: ['[data-message-author-role="assistant"]'],
+			// ChatGPT keeps only a window of the transcript mounted and reserves
+			// the space for the turns either side with empty divs. Unlike
+			// claude.ai's single spacer these do not stand for the whole of the
+			// rest: a 64-turn chat had five of them around ten mounted rows, so
+			// they prove the transcript is cut short without saying by how much.
+			placeholder: 'div[class*="last-known-height"]',
 			noise: ['[data-testid*="promo"]', '[data-testid*="upsell"]'],
 		},
 		{
@@ -43,6 +49,7 @@
 			host: /^chat\.openai\.com$/,
 			user: ['[data-message-author-role="user"]'],
 			assistant: ['[data-message-author-role="assistant"]'],
+			placeholder: 'div[class*="last-known-height"]',
 			noise: ['[data-testid*="promo"]', '[data-testid*="upsell"]'],
 		},
 	];

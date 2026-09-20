@@ -164,6 +164,29 @@ current conversations, and `thinking` blocks are skipped.
 Falling back to the DOM stays correct when the fetch fails, and the panel then
 says "N of M rows loaded" rather than presenting a count it cannot stand behind.
 
+**ChatGPT virtualizes too, and worse for our purposes.** Same symptom - `:ls`
+found 2 turns - but a different mechanism and no way to count around it.
+Unrendered turns are empty divs whose class reserves their height,
+`div[class*="last-known-height"]`, and only the ones adjacent to the mounted
+window exist at all. A conversation with 64 user turns on its live branch had
+about ten mounted rows and five placeholders, so `rendered + placeholders` is
+not the total and nothing in the DOM is.
+
+The page's own data is behind `/backend-api/conversation/<id>`, which returns
+404 on cookies alone; it wants `Authorization: Bearer <accessToken>`, and the
+token comes from `/api/auth/session`. That works, but it means handling the
+user's access token, which claude.ai never required - cookies carried that one.
+Not shipped without asking.
+
+Note also that the payload is a tree, not a list. The 165 mapping nodes include
+every edit and regeneration; the conversation as displayed is the path from
+`current_node` back through `parent`, which came to 64 user and 92 assistant
+messages. Counting mapping nodes would overcount by every branch the user ever
+abandoned. User text is in `message.content.parts`, an array of strings.
+
+Until that decision is made, ChatGPT reports what it can stand behind: the turns
+that are loaded, and plainly that the rest is not, with no invented total.
+
 **A warning about measuring any of this from automation.** The tab driving these
 experiments reported `visibilityState: "hidden"` and `requestAnimationFrame`
 never fired, so nothing repainted. Under those conditions the virtualizer cannot

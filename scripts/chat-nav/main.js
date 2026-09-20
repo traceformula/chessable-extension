@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.30.0';
+	ns.version = '1.30.1';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -95,9 +95,11 @@
 	}
 
 	function virtualized() {
-		if (!site.spacer) return false;
-		const spacer = document.querySelector(site.spacer);
-		return !!spacer && spacer.getBoundingClientRect().height > 1;
+		if (site.spacer) {
+			const spacer = document.querySelector(site.spacer);
+			if (spacer && spacer.getBoundingClientRect().height > 1) return true;
+		}
+		return !!(site.placeholder && document.querySelector(site.placeholder));
 	}
 
 	function scroller() {
@@ -351,8 +353,11 @@ input {
 		// the length of the conversation.
 		const heading = found.complete
 			? all.length + ' turns  ·  :N to jump, :q to close'
-			: all.length + ' of ' + (found.total || '?') + ' rows loaded  ·  ' +
-			  'this page keeps only part of a long chat';
+			: found.total
+				? all.length + ' shown, ' + found.total + ' rows in this chat  ·  ' +
+				  'the rest is not loaded'
+				: all.length + ' shown  ·  only part of this chat is loaded, ' +
+				  'and the page will not say how much';
 		renderPanel(heading, rows);
 		say('');
 	}

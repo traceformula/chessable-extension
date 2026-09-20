@@ -76,6 +76,15 @@
 
 	ns.scroll = { by, to, target };
 
+	// An event raised inside a shadow root is retargeted to the host, so a guard
+	// reading e.target sees a plain div where the real target is a text box -
+	// which is how typing into one ends up firing the page shortcuts instead.
+	// composedPath() keeps the truth for an open root.
+	function keyTarget(e) {
+		const path = e && typeof e.composedPath === 'function' ? e.composedPath() : null;
+		return path && path.length ? path[0] : (e && e.target);
+	}
+
 	function editable(node) {
 		if (!node) return false;
 		const tag = node.tagName;
@@ -87,7 +96,7 @@
 		if (e.__kbmScrollSeen) return;
 		e.__kbmScrollSeen = true;
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
-		if (editable(e.target)) return;
+		if (editable(keyTarget(e))) return;
 		// Hints own the keyboard while they are up, and their alphabet includes
 		// both of these letters. Checked via the document flag as well, so this
 		// holds even when the two end up in different worlds.

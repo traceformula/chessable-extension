@@ -190,6 +190,39 @@ release ships with the rest of the page layer, so `blur.js` had to go into
 `PAGE_JS` in the service worker as well as into the manifest entry. Missing one
 of the two is the obvious way to half-ship this.
 
+## Shadow roots hide the text box from every guard
+
+Found v1.29.1, from a report that ":collapse" could only be typed as ":collape"
+on claude.ai.
+
+Every key guard in the extension stands down when the key was typed into a text
+box, and every one of them asked the same two questions: `e.target` and
+`document.activeElement`. Both of them stop at a shadow boundary.
+
+An event raised inside a shadow root is retargeted to the host on its way out,
+and `document.activeElement` reports the host too. Measured on claude.ai with a
+focused `<input>` inside an open shadow root:
+
+    e.target               DIV    (NOT editable)   <- what the guard saw
+    document.activeElement DIV
+    composedPath()[0]      INPUT  (editable)       <- the truth
+
+So the chat command line, which lives in a shadow root precisely to keep these
+sites' CSS out, looked like a plain `<div>` to `scroll.js` - and the page layer
+was registered on claude.ai, so the "s" in "collapse" scrolled the page instead
+of reaching the input. Every other letter in the word is unbound, which is why
+exactly one character went missing.
+
+The fix is `composedPath()[0]` for the target and a walk down `shadowRoot
+.activeElement` for the focus, applied in every guard: `scroll.js`, `hints.js`,
+`blur.js`, the chess `main.js` and chat-nav's own handler. Duplicated per file
+rather than shared, as `editable()` already is.
+
+This was never only about our own command line. Any page built out of web
+components puts its text boxes inside shadow roots, and on all of them the
+typing guard was failing open. Closed roots stay invisible by design -
+`composedPath()` stops at the host - and nothing can be done about those.
+
 ## Match patterns
 
 Chrome match patterns are host-exact: `https://www.site.com/*` does not match

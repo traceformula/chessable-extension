@@ -16,7 +16,7 @@
 	}
 	const { match, forms, canon, isComplete, isExtendable } = ns.matcher;
 
-	ns.version = '1.29.0';
+	ns.version = '1.29.1';
 
 	const ACCEPTS = /^[a-hA-HNBRQKnbrqk1-8oO0xX=-]$/;
 
@@ -89,6 +89,14 @@
 	// then feed "x", "d", "2" into the next move.
 	let tail = null;
 	let hideTimer = null;
+
+	// An event raised inside a shadow root is retargeted to the host, so a guard
+	// reading e.target sees a plain div where the real target is a text box.
+	// composedPath() keeps the truth for an open root.
+	function keyTarget(e) {
+		const path = e && typeof e.composedPath === 'function' ? e.composedPath() : null;
+		return path && path.length ? path[0] : (e && e.target);
+	}
 
 	function editable(node) {
 		if (!node) return false;
@@ -289,13 +297,14 @@
 
 		// Escape returns from the chat line to the board. Every other key typed in
 		// a text field is the site's, so chat still works normally.
-		if (site.inputMode === 'coords' && e.key === 'Escape' && editable(e.target)) {
+		const typedInto = keyTarget(e);
+		if (site.inputMode === 'coords' && e.key === 'Escape' && editable(typedInto)) {
 			e.preventDefault();
-			e.target.blur();
+			typedInto.blur();
 			reset();
 			return;
 		}
-		if (editable(e.target)) return;
+		if (editable(typedInto)) return;
 
 		if (site.inputMode === 'coords') {
 			const nav = { ArrowLeft: 'back', ArrowRight: 'forward',

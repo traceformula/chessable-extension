@@ -32,6 +32,25 @@
 		return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 	}
 
+	// An event raised inside a shadow root is retargeted to the host on its way
+	// out, so a listener on window sees a plain <div> where the real target is an
+	// <input>. composedPath() still holds the truth for an open root. Any page
+	// built out of web components hits this, not just our own command line.
+	function originalTarget(e) {
+		if (!e) return null;
+		const path = typeof e.composedPath === 'function' ? e.composedPath() : null;
+		return path && path.length ? path[0] : e.target;
+	}
+
+	// document.activeElement stops at the shadow host for the same reason.
+	function deepActive(doc) {
+		let el = doc && doc.activeElement;
+		while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+			el = el.shadowRoot.activeElement;
+		}
+		return el;
+	}
+
 	function shouldRelease(e, active) {
 		if (!e || e.key !== 'Escape') return false;
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return false;
@@ -40,14 +59,14 @@
 
 	function install() {
 		window.addEventListener('keydown', function (e) {
-			const active = document.activeElement;
+			const active = deepActive(document);
 			if (!shouldRelease(e, active)) return;
 			setTimeout(function () {
 				// Only if the page has not already moved focus somewhere itself.
-				if (document.activeElement === active && active.blur) active.blur();
+				if (deepActive(document) === active && active.blur) active.blur();
 			}, 0);
 		}, true);
 	}
 
-	return { isEditable, shouldRelease, install };
+	return { isEditable, shouldRelease, originalTarget, deepActive, install };
 });

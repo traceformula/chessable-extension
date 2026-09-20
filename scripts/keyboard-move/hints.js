@@ -476,6 +476,15 @@
 		},
 	};
 
+	// An event raised inside a shadow root is retargeted to the host, so a guard
+	// reading e.target sees a plain div where the real target is a text box -
+	// which is how typing into one ends up firing the page shortcuts instead.
+	// composedPath() keeps the truth for an open root.
+	function keyTarget(e) {
+		const path = e && typeof e.composedPath === 'function' ? e.composedPath() : null;
+		return path && path.length ? path[0] : (e && e.target);
+	}
+
 	function editable(node) {
 		if (!node) return false;
 		const tag = node.tagName;
@@ -496,7 +505,7 @@
 			if (ns.hints.handleKey(e)) e.stopImmediatePropagation();
 			return;
 		}
-		if (editable(e.target)) return;
+		if (editable(keyTarget(e))) return;
 
 		// "?" lists the keys that work here. Skipped where the board scripts are
 		// loaded: those answer it with a fuller panel that also covers moves, and

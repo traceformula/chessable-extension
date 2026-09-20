@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.29.0';
+	ns.version = '1.29.1';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -371,6 +371,23 @@ input {
 		}
 	}
 
+	// document.activeElement stops at a shadow host, and an event from inside one
+	// is retargeted to it, so both have to be followed inward to find the real
+	// text box. Our own command line lives in a shadow root, and so do the
+	// controls on any page built out of web components.
+	function deepActive() {
+		let el = document.activeElement;
+		while (el && el.shadowRoot && el.shadowRoot.activeElement) {
+			el = el.shadowRoot.activeElement;
+		}
+		return el;
+	}
+
+	function keyTarget(e) {
+		const path = e && typeof e.composedPath === 'function' ? e.composedPath() : null;
+		return path && path.length ? path[0] : (e && e.target);
+	}
+
 	function editable(el) {
 		if (!el) return false;
 		if (el.isContentEditable) return true;
@@ -392,14 +409,14 @@ input {
 
 		if (e.key === 'Escape') {
 			if (e.shiftKey) return;
-			const active = document.activeElement;
+			const active = deepActive();
 			if (editable(active)) {
 				// Give the keyboard back, the way vim leaves insert mode. The key
 				// itself is left alone, since both sites bind Escape themselves,
 				// and the blur waits a tick so that a composer answering Escape by
 				// refocusing itself loses to us rather than the other way round.
 				setTimeout(function () {
-					if (document.activeElement === active && active.blur) active.blur();
+					if (deepActive() === active && active.blur) active.blur();
 				}, 0);
 				return;
 			}
@@ -410,7 +427,7 @@ input {
 		// Shift is not excluded above: ":" needs it on most layouts.
 		if (e.key !== ':') return;
 		// Never while they are writing a prompt - a colon belongs in the text.
-		if (editable(e.target) || editable(document.activeElement)) return;
+		if (editable(keyTarget(e)) || editable(deepActive())) return;
 		e.preventDefault();
 		e.stopPropagation();
 		openBar();

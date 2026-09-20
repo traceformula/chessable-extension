@@ -2,6 +2,7 @@ const assert = require('assert');
 const { parse, COMMANDS } = require('../scripts/chat-nav/command.js');
 const { label } = require('../scripts/chat-nav/outline.js');
 const { siteFor } = require('../scripts/chat-nav/sites.js');
+const { turnsFromConversation, textOf } = require('../scripts/chat-nav/claude-api.js');
 
 let passed = 0, failed = 0;
 function test(name, fn) {
@@ -117,6 +118,78 @@ test('every site names a user and an assistant selector', () => {
 		assert.ok(s.user.length, s.name + ' has no user selector');
 		assert.ok(s.assistant.length, s.name + ' has no assistant selector');
 	}
+});
+
+// ------------------------------------------------- the complete transcript
+
+// claude.ai renders only the rows near the viewport, so counting what is in
+// the page reported "2 turns" for a conversation with 38. These cover reading
+// the whole thing from the payload the page itself loads.
+
+const msg = (sender, index, text, extra) => Object.assign({
+	sender, index,
+	text: '',                       // empty on current conversations
+	content: [{ type: 'text', text }],
+}, extra);
+
+test('every human turn is found, with the row index that locates it', () => {
+	const payload = { chat_messages: [
+		msg('human', 0, 'first question'),
+		msg('assistant', 1, 'an answer'),
+		msg('human', 2, 'second question'),
+		msg('assistant', 3, 'another answer'),
+	] };
+	const out = turnsFromConversation(payload);
+	assert.strictEqual(out.total, 4);
+	assert.deepStrictEqual(out.turns.map(t => t.row), [0, 2]);
+	assert.deepStrictEqual(out.turns.map(t => t.text), ['first question', 'second question']);
+});
+
+test('a 38-turn conversation reports 38, not what is on screen', () => {
+	// The reported case: 76 messages, 38 of them human.
+	const messages = [];
+	for (let i = 0; i < 76; i++) {
+		messages.push(msg(i % 2 === 0 ? 'human' : 'assistant', i, 'turn ' + i));
+	}
+	const out = turnsFromConversation({ chat_messages: messages });
+	assert.strictEqual(out.total, 76);
+	assert.strictEqual(out.turns.length, 38);
+	assert.strictEqual(out.turns[37].row, 74);
+});
+
+test('thinking blocks are not mistaken for what was typed', () => {
+	const m = { sender: 'human', index: 0, content: [
+		{ type: 'thinking', thinking: 'pondering' },
+		{ type: 'text', text: 'the actual prompt' },
+	] };
+	assert.strictEqual(textOf(m), 'the actual prompt');
+});
+
+test('several text blocks are joined', () => {
+	const m = { content: [{ type: 'text', text: 'one' }, { type: 'text', text: 'two' }] };
+	assert.strictEqual(textOf(m), 'one\ntwo');
+});
+
+test('the plain text field is used when there are no blocks', () => {
+	assert.strictEqual(textOf({ text: 'older shape' }), 'older shape');
+	assert.strictEqual(textOf({ content: [], text: 'older shape' }), 'older shape');
+	assert.strictEqual(textOf(null), '');
+});
+
+test('array position stands in for a missing index', () => {
+	const out = turnsFromConversation({ chat_messages: [
+		{ sender: 'assistant', content: [{ type: 'text', text: 'a' }] },
+		{ sender: 'human', content: [{ type: 'text', text: 'q' }] },
+	] });
+	assert.strictEqual(out.turns[0].row, 1);
+});
+
+test('an unusable payload yields nothing rather than an empty outline', () => {
+	// Falling back to the DOM is right here; pretending to zero turns is not.
+	assert.strictEqual(turnsFromConversation(null), null);
+	assert.strictEqual(turnsFromConversation({}), null);
+	assert.strictEqual(turnsFromConversation({ chat_messages: [] }), null);
+	assert.strictEqual(turnsFromConversation({ chat_messages: [msg('assistant', 0, 'only replies')] }), null);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

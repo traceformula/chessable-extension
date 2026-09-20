@@ -138,10 +138,42 @@ the end of the chain as a fallback and as a reminder that this is how the
 feature breaks. An empty chain is reported out loud; `:help` names the selector
 currently matching, so a stale one is a one-line fix in `sites.js`.
 
-**No virtualization on claude.ai.** An 11,720px transcript held exactly the same
-element counts at the top, the middle and the bottom, so the whole conversation
-is in the DOM and the outline is complete. Worth re-checking on a much longer
-one, and on ChatGPT, before trusting it absolutely.
+**claude.ai virtualizes its transcript.** An earlier note here said it did not,
+on the evidence of an 11,720px conversation whose counts never changed. That
+conversation was simply short enough to fit; the claim did not survive a longer
+one. A 38-turn chat had *2* user messages in the page and a `transcript-spacer`
+div 26,988px tall standing in for everything else, which is exactly why `:ls`
+reported "2 turns".
+
+The structure is `[data-testid="transcript-row"]`, each carrying `data-index`
+and `data-perf-row-from-tail`. Those two sum to a constant, so the length of the
+whole transcript is `index + fromTail + 1` from any single rendered row - 76,
+confirmed against the API.
+
+So the outline is read from the endpoint the page itself loads:
+
+    /api/organizations/<org>/chat_conversations/<id>?tree=True&rendering_mode=messages
+
+Same origin, the user's own session, nothing leaves the page. 76 messages, 38
+human, and each message's `index` matches the DOM's `data-index` exactly -
+verified row by row against the five that happened to be rendered, senders and
+all. That correspondence is what makes jumping to an unrendered turn possible.
+The words are in `content[]` blocks of type `text`; the `text` field is empty on
+current conversations, and `thinking` blocks are skipped.
+
+Falling back to the DOM stays correct when the fetch fails, and the panel then
+says "N of M rows loaded" rather than presenting a count it cannot stand behind.
+
+**A warning about measuring any of this from automation.** The tab driving these
+experiments reported `visibilityState: "hidden"` and `requestAnimationFrame`
+never fired, so nothing repainted. Under those conditions the virtualizer cannot
+render new rows however it is scrolled, and two conclusions drawn here before
+that was noticed - that scanning by scrolling wedges the renderer, and that the
+virtualizer ignores programmatic scrolling - are artifacts of the hidden tab
+rather than findings about the site. The seek in `main.js` is therefore
+UNVERIFIED. Reading the transcript from the API is still the better design, for
+being instant and complete rather than repainting the conversation to count it,
+but it was not chosen on the evidence those two experiments appeared to give.
 
 **claude.ai does not scroll the document.** `document.scrollingElement` reports
 754px; the transcript is an inner `overflow-y-auto` container. Nothing here

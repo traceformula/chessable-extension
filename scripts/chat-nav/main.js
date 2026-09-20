@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.29.1';
+	ns.version = '1.30.0';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;
@@ -67,12 +67,99 @@
 		return null;
 	}
 
-	function turns() {
+	function domTurns() {
 		const found = firstMatch(site.user);
 		if (!found) return [];
 		return found.elements.map((el, i) => ({
 			n: i + 1, el, text: label(el.textContent),
 		}));
+	}
+
+	function rowEls() {
+		return site.row ? Array.from(document.querySelectorAll(site.row)) : [];
+	}
+
+	// How many rows the transcript has in total, not how many are in the page.
+	// Each rendered row knows its own index and its distance from the end, and
+	// the two together name the length of the whole thing.
+	function domTotal() {
+		let total = 0;
+		for (const row of rowEls()) {
+			const index = Number(row.dataset.index);
+			const fromTail = Number(row.dataset.perfRowFromTail);
+			if (!isNaN(index) && !isNaN(fromTail)) {
+				total = Math.max(total, index + fromTail + 1);
+			}
+		}
+		return total;
+	}
+
+	function virtualized() {
+		if (!site.spacer) return false;
+		const spacer = document.querySelector(site.spacer);
+		return !!spacer && spacer.getBoundingClientRect().height > 1;
+	}
+
+	function scroller() {
+		const anchor = document.querySelector(site.row || site.user[0]);
+		for (let node = anchor && anchor.parentElement; node; node = node.parentElement) {
+			const style = getComputedStyle(node);
+			if (/auto|scroll/.test(style.overflowY) &&
+				node.scrollHeight > node.clientHeight + 50) return node;
+		}
+		return null;
+	}
+
+	// The whole conversation where the site will tell us, the rendered part
+	// otherwise. `complete` says which, so nothing ever reports a count it
+	// cannot stand behind.
+	async function allTurns() {
+		const api = ns.claudeApi;
+		if (api && api.supports()) {
+			let loaded = null;
+			try { loaded = await api.load(domTotal() || null); } catch (e) { loaded = null; }
+			if (loaded && loaded.turns.length) {
+				return {
+					complete: true,
+					total: loaded.total,
+					turns: loaded.turns.map((turn, i) => ({
+						n: i + 1, row: turn.row, text: label(turn.text),
+					})),
+				};
+			}
+		}
+		return { complete: !virtualized(), total: domTotal(), turns: domTurns() };
+	}
+
+	// Walk to a row that is not in the page yet. The virtualizer renders what is
+	// near the scroll position, so each guess is corrected by the indices that
+	// came back - a handful of jumps rather than a walk through the transcript,
+	// which is far too expensive to repaint.
+	async function seek(row) {
+		const sc = scroller();
+		if (!sc || !site.row) return null;
+		const exact = () => document.querySelector(site.row + '[data-index="' + row + '"]');
+
+		let hit = exact();
+		const total = Math.max(domTotal(), 1);
+		for (let attempt = 0; !hit && attempt < 10; attempt++) {
+			const rendered = rowEls().map(r => Number(r.dataset.index)).filter(v => !isNaN(v));
+			const perRow = Math.max(1, sc.scrollHeight / total);
+			let target;
+			if (!rendered.length) {
+				target = (row / total) * (sc.scrollHeight - sc.clientHeight);
+			} else {
+				const low = Math.min.apply(null, rendered);
+				const high = Math.max.apply(null, rendered);
+				if (row < low) target = sc.scrollTop - (low - row) * perRow;
+				else if (row > high) target = sc.scrollTop + (row - high) * perRow;
+				else break;
+			}
+			sc.scrollTop = Math.max(0, Math.min(target, sc.scrollHeight));
+			await new Promise(r => setTimeout(r, 150));
+			hit = exact();
+		}
+		return hit || null;
 	}
 
 	// -------------------------------------------------------------- the UI
@@ -207,24 +294,38 @@ input {
 		setTimeout(() => el.classList.remove('chatnav-flash'), 1300);
 	}
 
-	function jump(which) {
-		const list = turns();
-		if (!list.length) {
+	async function jump(which) {
+		const found = await allTurns();
+		if (!found.turns.length) {
 			say('no turns found - selectors may have moved (:h)');
 			return;
 		}
-		const turn = which === 'last' ? list[list.length - 1] : list[which - 1];
+		const turn = which === 'last'
+			? found.turns[found.turns.length - 1]
+			: found.turns[which - 1];
 		if (!turn) {
-			say('only ' + list.length + ' turn' + (list.length === 1 ? '' : 's'));
+			say('only ' + found.turns.length + ' turn' +
+				(found.turns.length === 1 ? '' : 's'));
 			return;
 		}
-		turn.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-		flash(turn.el);
-		say(turn.n + '/' + list.length + '  ' + turn.text);
+
+		let el = turn.el || null;
+		if (!el && typeof turn.row === 'number') {
+			say('finding turn ' + turn.n + '\u2026');
+			el = await seek(turn.row);
+		}
+		if (!el) {
+			say('turn ' + turn.n + ' did not load: ' + turn.text);
+			return;
+		}
+		el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+		flash(el);
+		say(turn.n + '/' + found.turns.length + '  ' + turn.text);
 	}
 
-	function list() {
-		const all = turns();
+	async function list() {
+		const found = await allTurns();
+		const all = found.turns;
 		if (!all.length) {
 			say('no turns found - selectors may have moved (:h)');
 			return;
@@ -240,13 +341,19 @@ input {
 			txt.textContent = turn.text;          // textContent: never innerHTML
 			row.append(num, txt);
 			row.addEventListener('click', () => {
-				turn.el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-				flash(turn.el);
 				closePanel();
+				jump(turn.n);
 			});
 			return row;
 		});
-		renderPanel(all.length + ' turns  ·  :N to jump, :q to close', rows);
+		// A count taken from the rendered rows alone is a count of what happens
+		// to be on screen, so it is labelled as such rather than passed off as
+		// the length of the conversation.
+		const heading = found.complete
+			? all.length + ' turns  ·  :N to jump, :q to close'
+			: all.length + ' of ' + (found.total || '?') + ' rows loaded  ·  ' +
+			  'this page keeps only part of a long chat';
+		renderPanel(heading, rows);
 		say('');
 	}
 
@@ -321,18 +428,19 @@ input {
 		const found = firstMatch(site.user);
 		renderPanel(
 			site.name + '  ·  v' + ns.version + '  ·  ' +
-			(found ? found.elements.length + ' turns via ' + found.selector
+			(found ? found.elements.length + ' rows in page via ' + found.selector +
+			         (virtualized() ? ' (of ' + domTotal() + ', rest not loaded)' : '')
 			       : 'NO TURNS MATCHED - selectors need updating'),
 			[jumpRow].concat(rows));
 		say('');
 	}
 
-	function run(text) {
+	async function run(text) {
 		const result = parse(text);
 		switch (result.kind) {
 			case 'none': break;
-			case 'jump': jump(result.turn); break;
-			case 'ls': list(); break;
+			case 'jump': await jump(result.turn); break;
+			case 'ls': await list(); break;
 			case 'collapse': fold(true); break;
 			case 'expand': fold(false); break;
 			case 'mute': mute(!muted); break;
@@ -360,7 +468,7 @@ input {
 			e.preventDefault();
 			const text = input.value;
 			input.value = '';
-			run(text);
+			run(text).catch(function () { say('that did not work'); });
 			// The bar stays up: ":ls" then ":7" is the whole point, and vim
 			// leaves you on the command line between counted jumps too.
 			return;

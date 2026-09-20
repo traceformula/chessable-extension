@@ -22,6 +22,12 @@
 			host: /^(www\.)?claude\.ai$/,
 			user: ['[data-testid="user-message"]'],
 			assistant: ['[data-testid="assistant-message"]', '.font-claude-response'],
+			// claude.ai keeps only the rows near the viewport; the rest of the
+			// transcript is one spacer div holding their collected height. Each
+			// row carries data-index, which matches the message index the API
+			// reports, and that is what makes jumping to an unrendered turn work.
+			row: '[data-testid="transcript-row"]',
+			spacer: '[data-testid="transcript-spacer"]',
 			// Verified present; anything promotional lives outside the transcript.
 			noise: ['[data-testid*="upsell"]', '[class*="upgrade-banner"]'],
 		},

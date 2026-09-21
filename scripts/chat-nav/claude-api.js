@@ -59,10 +59,18 @@
 		return m ? m[1] : null;
 	}
 
+	// Pinned to this origin rather than left relative: a page can retarget a
+	// relative fetch with one <base href> tag. No token rides along here, only
+	// cookies, which the browser would withhold from another origin anyway -
+	// but the two loaders should not differ on something like this.
+	function here(path) {
+		return new URL(path, location.origin).toString();
+	}
+
 	let orgPromise = null;
 	function organisation() {
 		if (orgPromise) return orgPromise;
-		orgPromise = fetch('/api/organizations', { credentials: 'same-origin' })
+		orgPromise = fetch(here('/api/organizations'), { credentials: 'same-origin' })
 			.then(r => (r.ok ? r.json() : null))
 			.then(list => (Array.isArray(list) && list.length ? list[0].uuid : null))
 			.catch(() => null);
@@ -88,8 +96,8 @@
 		const org = await organisation();
 		if (!org) return null;
 
-		const url = '/api/organizations/' + org + '/chat_conversations/' + id +
-			'?tree=True&rendering_mode=messages';
+		const url = here('/api/organizations/' + org + '/chat_conversations/' + id +
+			'?tree=True&rendering_mode=messages');
 		let payload = null;
 		try {
 			const res = await fetch(url, { credentials: 'same-origin' });

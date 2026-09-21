@@ -376,6 +376,32 @@ release ships with the rest of the page layer, so `blur.js` had to go into
 `PAGE_JS` in the service worker as well as into the manifest entry. Missing one
 of the two is the obvious way to half-ship this.
 
+## Never leave a credentialled fetch relative
+
+v1.35.1, from the security review of the ChatGPT loader.
+
+Both loaders called `fetch()` with a relative path. A relative URL resolves
+against the *document's* base URL, and a page sets that with a single `<base
+href>` tag - no script required, so even a CSP strict enough to block inline
+script would not prevent it. The ChatGPT loader sends the user's session access
+token as a bearer, so the destination of a token-bearing request was decided by
+the page's markup rather than by us.
+
+Redirects were never the hole: Chrome strips `Authorization` on a cross-origin
+redirect. `credentials: 'same-origin'` is no help either, since the header is
+set explicitly and travels regardless. And this is not path-only SSRF - `<base>`
+changes the host.
+
+Both loaders now build every URL with `new URL(path, location.origin)`. The
+claude.ai one carries no token, only cookies, which the browser would withhold
+from another origin anyway - but the two should not differ on something like
+this, and the next person to add a fetch should find one pattern.
+
+The review's other four surfaces came back clean, and two of the reasons are
+worth keeping: the token is unreachable from page script because chat-nav is
+ISOLATED, and `load()` only ever runs on an explicit `:ls` or `:N`, never on
+page load.
+
 ## A registered content script that never injected
 
 v1.35.0. On chatgpt.com, `w`, `s` and `;` did nothing after Escape, while `:`

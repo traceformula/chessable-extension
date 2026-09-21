@@ -89,10 +89,22 @@
 		return HOSTS.test(location.hostname) && !!conversationId();
 	}
 
+	// Pinned to this origin, never left relative.
+	//
+	// A relative URL handed to fetch() resolves against the *document's* base
+	// URL, and a page can set that with a single <base href> tag - no script
+	// needed, so even a CSP that blocks inline script would not prevent it.
+	// Everything here carries the user's session token, and a token is not
+	// something to send wherever the page's markup happens to point. Redirects
+	// are already safe: Chrome strips Authorization on a cross-origin one.
+	function here(path) {
+		return new URL(path, location.origin).toString();
+	}
+
 	let tokenPromise = null;
 	function sessionToken() {
 		if (tokenPromise) return tokenPromise;
-		tokenPromise = fetch('/api/auth/session', { credentials: 'same-origin' })
+		tokenPromise = fetch(here('/api/auth/session'), { credentials: 'same-origin' })
 			.then(r => (r.ok ? r.json() : null))
 			.then(j => (j && j.accessToken) || null)
 			.catch(() => null);
@@ -102,7 +114,7 @@
 	let cache = null;   // { id, data }
 
 	async function fetchOnce(id, token) {
-		return fetch('/backend-api/conversation/' + id, {
+		return fetch(here('/backend-api/conversation/' + id), {
 			credentials: 'same-origin',
 			headers: { Authorization: 'Bearer ' + token },
 		});

@@ -19,7 +19,7 @@
 	if (!site) return;
 
 	ns.ready = true;
-	ns.version = '1.35.0';
+	ns.version = '1.35.1';
 	ns.site = site.name;
 
 	const parse = ns.command.parse;

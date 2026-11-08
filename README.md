@@ -274,6 +274,20 @@ permissions you grant yourself, one at a time, and any of them can be taken
 back from `chrome://extensions` without affecting the others. Removing one from
 the popup revokes the permission outright rather than merely disabling it.
 
+**A development server on your own machine** works too: type
+`localhost:4173`, or `http://localhost:4173`, or `127.0.0.1:8080`. Two things
+are worth knowing. The port is dropped, because a Chrome match pattern does not
+have one — a single grant covers every port on that host. And with no scheme
+typed, both `http` and `https` are requested, since a dev server is usually
+plain `http` and guessing wrong would hand back a grant that silently matches
+nothing.
+
+`http` is offered **only** for `localhost`, `127.0.0.1` and `*.localhost`. Every
+other site is requested over `https` whatever you type, so a plaintext grant
+cannot be handed out for the open web by a typo. An IP address on the local
+network, like `192.168.1.5`, is not covered by that exception and will not work
+over `http`.
+
 Only page navigation extends this way. The board adapters read one site's
 internals each and have nothing to offer an arbitrary page.
 

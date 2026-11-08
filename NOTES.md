@@ -376,6 +376,38 @@ release ships with the rest of the page layer, so `blur.js` had to go into
 `PAGE_JS` in the service worker as well as into the manifest entry. Missing one
 of the two is the obvious way to half-ship this.
 
+## Local development servers
+
+v1.36.0. `http://localhost:4173` was refused by the options page as "not a site
+address", for two reasons at once, either of which alone would have stopped it.
+
+The validator rejected any host without a dot, which is every loopback name.
+And `optional_host_permissions` was `https://*/*` only, so even a host that
+passed validation could not have been granted over `http` - Chrome refuses a
+request for an origin the manifest never offered.
+
+Both are fixed, narrowly. `http` is now offered for `localhost`, `127.0.0.1`
+and `*.localhost` and nowhere else; every other site is still requested over
+`https` whatever is typed, so a typo cannot hand out a plaintext grant for the
+open web.
+
+Two details that are easy to get wrong:
+
+- **A match pattern has no port.** `http://localhost:4173/*` is not a pattern;
+  the port is dropped and one grant covers every port on the host. Worth knowing
+  rather than discovering - it means switching dev ports needs no new grant.
+- **With no scheme typed, both are requested.** A dev server is usually plain
+  `http`, and defaulting to `https` would have handed back a grant that silently
+  matched nothing, which is the failure this whole area keeps producing.
+
+`patternsFor` and `hostOf` moved to `scripts/site-patterns.js` so they can be
+tested in node at all - they were defined inline in a page script that touches
+`document` at the top level, which cannot be required. `BUILT_IN` went with
+them, and a test now asserts the list matches the service worker's copy. It had
+already drifted: the options page's copy predated the chat hosts moving into the
+manifest, so claude.ai and chatgpt.com would have been listed as removable
+extras that removing does nothing to.
+
 ## Never leave a credentialled fetch relative
 
 v1.35.1, from the security review of the ChatGPT loader.
